@@ -94,8 +94,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < N; i++) {
 		for (j = 0; j < N; j++) {
 			for (k = 0; k < N; k++) {
-				ba[i * N + j] =
-				    ba[i * N + j] + B[i * N + k] * A[k + j * N];
+				ba[i * N + j] = ba[i * N + j] + B[i * N + k] * A[k + j * N];
 			}
 		}
 	}
@@ -103,8 +102,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < N; i++) {
 		for (j = 0; j < N; j++) {
 			for (k = 0; k < N; k++) {
-				ca[i * N + j] =
-				    ca[i * N + j] + C[i * N + k] * A[k + j * N];
+				ca[i * N + j] = ca[i * N + j] + C[i * N + k] * A[k + j * N];
 			}
 		}
 	}
@@ -112,8 +110,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < N; i++) {
 		for (j = 0; j < N; j++) {
 			for (k = 0; k < N; k++) {
-				cad[i * N + j] =
-				    cad[i * N + j] + ca[i * N + k] * D[k + j * N];
+				cad[i * N + j] = cad[i * N + j] + ca[i * N + k] * D[k + j * N];
 			}
 		}
 	}

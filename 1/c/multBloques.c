@@ -92,8 +92,7 @@ int main(int argc, char *argv[])
 
 
 //SOLO PARA MATRICES DE IGUAL DIMENSION DE BLOQUES (N)
-void producto(double *A, double *B, double *C, int r, int N,
-	      int sizeMatrix, int sizeBlock)
+void producto(double *A, double *B, double *C, int r, int N, int sizeMatrix, int sizeBlock)
 {
 	int I, J, K, i, j, k;
 	int despA, despB, despC, desp;
@@ -111,12 +110,7 @@ void producto(double *A, double *B, double *C, int r, int N,
 					for (j = 0; j < r; j++) {
 						desp = despC + i * r + j;
 						for (k = 0; k < r; k++) {
-							C[desp] +=
-							    A[despA +
-							      i * r +
-							      k] *
-							    B[despB +
-							      k * r + j];
+							C[desp] += A[despA + i * r + k] * B[despB + k * r + j];
 						};
 					}
 				};
