@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <malloc.h>
 #include <stdlib.h>
 #include <math.h>
 
@@ -75,7 +74,6 @@ int main(int argc, char *argv[])
 	}
 
 
-	printf(" \n\n Realizando comprobacion ... \n");
 	for (i = 0; i < sizeMatrix; i++) {
 		if (A[i] != C[i]) {
 			printf("\n Error %f", C[i]);
