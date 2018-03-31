@@ -1,5 +1,6 @@
-#include<stdio.h>
-#include<stdlib.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
 
 int N = 100;
 
@@ -24,9 +25,7 @@ int main(int argc, char *argv[])
 
 	//Controla los argumentos al programa
 	if ((argc != 2) || ((N = atoi(argv[1])) <= 0)) {
-		printf
-		    ("\nUsar: %s n\n  n: Dimension de la matriz (nxn X nxn)\n",
-		     argv[0]);
+		printf ("\nUsar: %s n\n  n: Dimension de la matriz (nxn X nxn)\n", argv[0]);
 		exit(1);
 	}
 	//Aloca memoria para las matrices
@@ -41,51 +40,37 @@ int main(int argc, char *argv[])
 	//La matriz C se inicializa en 0
 	for (i = 0; i < N; i++) {
 		for (j = 0; j < N; j++) {
-
-			if (j < N - 1) {
+			if (j < N - 1)
 				A[i * N + j] = 0;
-			} else {
+			else
 				A[i * N + j] = 1;
-			}
-
-			if (i >= j) {
+			if (i >= j)
 				BT[i + N * j] = N;
-			} else {
+			else
 				BT[i + N * j] = 0;
-			}
-
 			C[i * N + j] = 0;
 		}
 	}
 
-	//Realiza la multiplicacion 
 	timetick = dwalltime();
-
 	for (i = 0; i < N; i++) {
 		for (j = 0; j < N; j++) {
 			for (k = 0; k < N; k++) {
-				C[i * N + j] =
-				    C[i * N + j] + A[i * N + k] * BT[k +
-								     j *
-								     N];
+				C[i * N + j] = C[i * N + j] + A[i * N + k] * BT[k + j * N];
 			}
 		}
 	}
-
 	printf("Tiempo en segundos %f\n", dwalltime() - timetick);
 
 	//Verifica el resultado
-	for (i = 0; i < N; i++) {
-		for (j = 0; j < N; j++) {
+	for (i = 0; i < N; i++)
+		for (j = 0; j < N; j++)
 			check = check && (C[i * N + j] == N);
-		}
-	}
 
-	if (check) {
+	if (check)
 		printf("Multiplicacion de matriz triangular correcta\n");
-	} else {
+	else
 		printf("Multiplicacion de matriz triangular erroneo\n");
-	}
 
 	free(A);
 	free(BT);

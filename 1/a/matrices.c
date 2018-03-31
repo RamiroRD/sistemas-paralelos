@@ -1,22 +1,35 @@
 #include<stdio.h>
-#include <stdlib.h>
-#include <sys/time.h>
+#include<stdlib.h>
+#include<sys/time.h>
+#define ORDENXFILAS 0
+#define ORDENXCOLUMNAS 1
 
+//Dimension por defecto de las matrices
 int N = 100;
 
 //Retorna el valor de la matriz en la posicion fila y columna segun el orden que este ordenada
-static inline double getValor(double *matriz, int fila, int columna)
+double getValor(double *matriz, int fila, int columna, int orden)
 {
-	return (matriz[fila + columna * N]);
+	if (orden == ORDENXFILAS) {
+		return (matriz[fila * N + columna]);
+	} else {
+		return (matriz[fila + columna * N]);
+	}
 }
 
 //Establece el valor de la matriz en la posicion fila y columna segun el orden que este ordenada
-static inline void setValor(double *matriz, int fila, int columna, double valor)
+void setValor(double *matriz, int fila, int columna, int orden,
+	      double valor)
 {
-	matriz[fila + columna * N] = valor;
+	if (orden == ORDENXFILAS) {
+		matriz[fila * N + columna] = valor;
+	} else {
+		matriz[fila + columna * N] = valor;
+	}
 }
 
-static double dwalltime()
+//Para calcular tiempo
+double dwalltime()
 {
 	double sec;
 	struct timeval tv;
@@ -48,18 +61,26 @@ int main(int argc, char *argv[])
 	//Inicializa las matrices A y B en 1, el resultado sera una matriz con todos sus valores en N
 	for (i = 0; i < N; i++) {
 		for (j = 0; j < N; j++) {
-			setValor(A, i, j, 1);
-			setValor(B, i, j, 1);
+			setValor(A, i, j, ORDENXFILAS, 1);
+			setValor(B, i, j, ORDENXFILAS, 1);
 		}
 	}
+
+
+	//Realiza la multiplicacion
 
 	timetick = dwalltime();
 
 	for (i = 0; i < N; i++) {
 		for (j = 0; j < N; j++) {
-			setValor(C, i, j, 0);
+			setValor(C, i, j, ORDENXFILAS, 0);
 			for (k = 0; k < N; k++) {
-				setValor(C, i, j, getValor(C, i, j) + getValor(A, i, k) * getValor(B, k, j));
+				setValor(C, i, j, ORDENXFILAS,
+					 getValor(C, i, j,
+						  ORDENXFILAS) +
+					 getValor(A, i, k,
+						  ORDENXFILAS) *
+					 getValor(B, k, j, ORDENXCOLUMNAS));
 			}
 		}
 	}
@@ -69,7 +90,8 @@ int main(int argc, char *argv[])
 	//Verifica el resultado
 	for (i = 0; i < N; i++) {
 		for (j = 0; j < N; j++) {
-			check = check && (getValor(C, i, j) == N);
+			check = check
+			    && (getValor(C, i, j, ORDENXFILAS) == N);
 		}
 	}
 
