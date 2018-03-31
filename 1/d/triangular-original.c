@@ -30,12 +30,12 @@ int main(int argc, char *argv[])
 	}
 	//Aloca memoria para las matrices
 	A = (double *) malloc(sizeof(double) * N * N);
-	BT = (double *) malloc(sizeof(double) * (N * (N + 1) ) / 2);
+	BT = (double *) malloc(sizeof(double) * N * N);
 	C = (double *) malloc(sizeof(double) * N * N);
 
 	//Inicializa las matrices
 	//La matriz A se inicializa todas las columnas en 0 menos la ultima
-	//La matriz BT se inicializa triangular inferior con N en cada elmeneto
+	//La matriz BT se inicializa triangular inferior con 1
 	//Esto permite que el resultado sean todos 1
 	//La matriz C se inicializa en 0
 	for (i = 0; i < N; i++) {
@@ -44,20 +44,22 @@ int main(int argc, char *argv[])
 				A[i * N + j] = 0;
 			else
 				A[i * N + j] = 1;
+			if (i >= j)
+				BT[i + N * j] = N;
+			else
+				BT[i + N * j] = 0;
 			C[i * N + j] = 0;
 		}
 	}
 
-	for(i = 0; i < (N * (N + 1))/2; i++) {
-		BT[i] = N;
-	}
-
 	timetick = dwalltime();
-	for (i = 0; i < N; i++)
-		for (j = 0; j < N; j++)
-			for (k = j; k < N; k++)
-				C[i * N + j] = C[i * N + j] + A[i * N + k] * BT[k + j * N - ( j * (j + 1) ) / 2];
-
+	for (i = 0; i < N; i++) {
+		for (j = 0; j < N; j++) {
+			for (k = 0; k < N; k++) {
+				C[i * N + j] = C[i * N + j] + A[i * N + k] * BT[k + j * N];
+			}
+		}
+	}
 	printf("Tiempo en segundos %f\n", dwalltime() - timetick);
 
 	//Verifica el resultado
