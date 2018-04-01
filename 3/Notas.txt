@@ -1,0 +1,1 @@
+Claramente las dos formas son formas bastante ineficientes de calcular la expresion. La segunda es incluso peor que la primera. Tener la optimizacion prendida hace que directamente no se haga el bucle, sino que se utiliza la formula n(n+1)/2.
