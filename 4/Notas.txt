@@ -1,0 +1,5 @@
+Creo que lo que se trata de mostrar en los incisos a y b es que conviene hacer multiplicaciones en vez de divisiones en caso que se pueda.
+Por ejemplo, para dividir al numero 5 en dos, conviene hacer 5.0 * 0.5 en vez de hacer 5.0 / 2.0.
+
+En el c, se quiere mostrar como se puede usar una mascara de bits en vez de usar el operador % cuando el segundo operando es potencia de 2.
+
