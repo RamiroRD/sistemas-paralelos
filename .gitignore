@@ -3,6 +3,7 @@
 !*/
 !*.*
 *.d
+!Makefile
 
 # Object files
 *.o
