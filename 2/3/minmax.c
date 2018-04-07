@@ -3,6 +3,12 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <time.h>
+#include <math.h>
+
+/* Globales */
+double *V;
+int n, t;
 
 double dwalltime()
 {
@@ -14,10 +20,9 @@ double dwalltime()
 	return sec;
 }
 
-
 void usage()
 {
-	printf("mult <n> <t>\n");
+	printf("minmax <n> <t>\n");
 }
 
 bool ispwtwo(int n)
@@ -29,34 +34,32 @@ bool ispwtwo(int n)
 }
 
 struct slave_args {
-	double *A;
-	double *B;
-	double *C;
-	int n;
-	int first_row;
-	int rows;
+	int base;
+	double min, max;
 };
 
 void *slave_routine(void *args)
 {
 	struct slave_args *arg = (struct slave_args*) args;
-	double *A = arg->A;
-	double *B = arg->B;
-	double *C = arg->C;
-	int n = arg->n;
-	for (int i = arg->first_row; i < arg->first_row + arg->rows; i++)
-		for (int j = 0; j < n; j++)
-			for (int k = 0; k < n; k++)
-				C[i * n + j] += A[i * n + k] * B[j * n + k];
-	return NULL;
+	double min = INFINITY, max = -INFINITY;
+	int base = arg->base;
+
+	for (int i = base; i < base + n / t; i++) {
+		if (V[i] < min)
+			min = V[i];
+		if (V[i] > max)
+			max = V[i];
+	}
+
+	arg->min = min;
+	arg->max = max;
+	return args;
 }
 
 int main(int argc, char **argv)
 {	
-	int n, t;
 	pthread_t *threads;
 	struct slave_args *args;
-	double *A, *B, *C;
 
 	if (argc < 3) {
 		usage();
@@ -67,30 +70,22 @@ int main(int argc, char **argv)
 	t = atoi(argv[2]);
 
 	if (!ispwtwo(t) || !ispwtwo(n)) {
-		printf("Threads y la dimensión de la matriz deben potencia de dos.\n");
+		printf("Sólo potencias de dos.\n");
 		return -1;
 	}
 
-	A = (double*) malloc(sizeof(double)*n*n);
-	B = (double*) malloc(sizeof(double)*n*n);
-	C = (double*) malloc(sizeof(double)*n*n);
+	V = (double*) malloc(sizeof(double) * n);
 
-	for (int i = 0; i < n * n; i++) {
-		A[i] = B[i] = 1.0;
-		C[i] = 0.0;
-	}
+	srand(time(NULL));
+	for (int i = 0; i < n; i++)
+		V[i] = rand();
 
 	threads = (pthread_t*) malloc(sizeof(pthread_t) * t);
 	args = (struct slave_args*) malloc(sizeof(struct slave_args) * t);
 	
 	double dur = dwalltime();
 	for (int i = 0; i < t; i++) {
-		args[i].A = A;
-		args[i].B = B;
-		args[i].C = C;
-		args[i].n = n;
-		args[i].first_row = i * n / t; 
-		args[i].rows = n / t; 
+		args[i].base = i * n / t;
 		pthread_create(threads + i, NULL, slave_routine, args + i);
 	}
 
@@ -98,19 +93,11 @@ int main(int argc, char **argv)
 		pthread_join(threads[i], NULL);
 	dur = dwalltime() - dur;
 
-	int ok = 1;
-	for (int i = 0; i < n * n; i++)
-		ok = ok && (C[i] == n);
-
-	fprintf(stderr, ok ? "OK\n" : "ERROR\n");
-	if (ok)
-		printf("%f\n", dur);
+	printf("%f\n", dur);
 	
 	free(threads);
 	free(args);
-	free(A);
-	free(B);
-	free(C);
+	free(V);
 
 	return 0;
 }
