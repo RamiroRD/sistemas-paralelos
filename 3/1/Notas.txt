@@ -1,0 +1,1 @@
+La variable i dentro del pragma parallel estaba definida como privada. Una variable privada de omp no se inicializa a ningun valor en particular, asi que accedé a algun lugar de memoria fuera de área.
