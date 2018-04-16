@@ -1,0 +1,11 @@
+Parece que la función que quere calcular está dada por la relación recurrente:
+f(n) = 3 f(n - 1) + sqrt(n * scale)
+donde scale = 2.78
+
+Así como está, el código no se puede paralelizar por la dependencia de datos.
+Pero el mismo cálculo se puede hacer con la expresión equivalente:
+
+f(n) = \Sigma^{k}_{ i = 1 } 3^(n - i) * sqrt(i * scale)
+
+Como en esta expresión no hay dependencia de datos entre iteraciones, se puede
+distribuir las iteraciones a distintos hilos.
