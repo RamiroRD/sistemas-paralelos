@@ -38,26 +38,35 @@ int main(int argc, char *argv[])
 			A[i * N + j] = B[i + j * N] = C[i * N + j] = 1;
 
 	timetick = dwalltime();
-
-	// Realiza la multiplicacion D = A x B
-	for (i = 0; i < N; i++) {
-		for (j = 0; j < N; j++) {
-			D[i * N + j] = 0;
-			for (k = 0; k < N; k++) {
-				D[i * N + j] = D[i * N + j] + A[i * N + k] * B[k + j * N];
+//default(none) private(i,j,k) shared(A,B,C,D,E,N) 
+#pragma omp parallel sections default(none) private(i,j,k) shared(A,B,C,D,E,N) 
+{
+#pragma omp section
+	{
+		// Realiza la multiplicacion D = A x B
+		for (i = 0; i < N; i++) {
+			for (j = 0; j < N; j++) {
+				D[i * N + j] = 0;
+				for (k = 0; k < N; k++) {
+					D[i * N + j] = D[i * N + j] + A[i * N + k] * B[k + j * N];
+				}
+			}
+		}
+	}
+#pragma omp section
+	{
+		// Realiza la multiplicacion E = C x B
+		for (i = 0; i < N; i++) {
+			for (j = 0; j < N; j++) {
+				E[i * N + j] = 0;
+				for (k = 0; k < N; k++) {
+					E[i * N + j] = E[i * N + j] + C[i * N + k] * B[k + j * N];
+				}
 			}
 		}
 	}
 
-	// Realiza la multiplicacion E = C x B
-	for (i = 0; i < N; i++) {
-		for (j = 0; j < N; j++) {
-			E[i * N + j] = 0;
-			for (k = 0; k < N; k++) {
-				E[i * N + j] = E[i * N + j] + C[i * N + k] * B[k + j * N];
-			}
-		}
-	}
+}
 
 	printf("Tiempo en segundos %f \n", dwalltime() - timetick);
 
