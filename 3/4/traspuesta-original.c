@@ -1,7 +1,7 @@
 //traspuesta.c
-#include <stdio.h>
-#include <stdlib.h>
-#include <omp.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<omp.h>
 
 /* Time in seconds from some point in the past */
 double dwalltime();
@@ -25,22 +25,26 @@ int main(int argc, char *argv[])
 	int numThreads = atoi(argv[2]);
 	omp_set_num_threads(numThreads);
 
-	// Aloca memoria para las matrices
+	//Aloca memoria para las matrices
 	A = (double *) malloc(sizeof(double) * N * N);
 
-	// Inicializa la matriz con unos en el triangulo inferior y ceros en el triangulo superior.
-	for (i = 0; i < N; i++)
-		for (j = 0; j < N; j++)
-			if (i >= j)
+	//Inicializa la matriz con unos en el triangulo inferior y ceros en el triangulo superior.
+	for (i = 0; i < N; i++) {
+		for (j = 0; j < N; j++) {
+			if (i >= j) {
 				A[i * N + j] = 1.0;
-			else
+			} else {
 				A[i * N + j] = 0.0;
+			}
+
+		}
+	}
 
 #pragma omp parallel default(none) private(i,j,temp,timetick,tid) shared(A,N)
 	{
 		tid = omp_get_thread_num();
 		timetick = dwalltime();
-#pragma omp for schedule(dynamic, 1) private(i,j,temp) nowait
+#pragma omp for private(i,j,temp) nowait
 		for (i = 0; i < N; i++) {
 			for (j = i + 1; j < N; j++) {
 				temp = A[i * N + j];
@@ -49,22 +53,29 @@ int main(int argc, char *argv[])
 
 			}
 		}
-		printf("Tiempo para thread %d: %f [s]\n", tid, dwalltime() - timetick);
+		printf("Tiempo en segundos para el thread %d: %f \n", tid,
+		       dwalltime() - timetick);
 	}
 
-	// Chequea los resultados
-	for (i = 0; i < N; i++)
-		for (j = 0; j < N; j++)
-			if (i > j)
+
+
+	//Chequea los resultados
+	for (i = 0; i < N; i++) {
+		for (j = 0; j < N; j++) {
+			if (i > j) {
 				check = check && (A[i * N + j] == 0.0);
-			else
+			} else {
 				check = check && (A[i * N + j] == 1.0);
+			}
 
-	if (check)
+		}
+	}
+
+	if (check) {
 		printf("Resultado correcto\n");
-	else
+	} else {
 		printf("Resultado erroneo\n");
-
+	}
 	free(A);
 	return (0);
 }
