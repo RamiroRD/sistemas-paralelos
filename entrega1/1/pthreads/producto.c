@@ -4,7 +4,6 @@
 #include <sys/time.h>
 #include <string.h>
 #include <stdbool.h>
-#include <pthread.h>
 
 int t, n;
 double *A, *B, *C;
@@ -24,12 +23,23 @@ void *worker(void *idp)
 	int id = *(int*) idp;
 	int slice = n / t;
 
+	/*
+	 * El operando de mano derecha tiene que ser A pero almacenado por
+	 * columnas.
+	 */
+	for (int i = id * slice; i < slice * (id + 1); i++)	
+		for (int j = 0; j < n; j++)	
+			B[i * n + j] = A[j * n + i];
+
 	pthread_barrier_wait(&barrier);
+
+	/*
+	 * Hacemos la multiplicación convencional.
+	 */
 	for (int i = id * slice; i < slice * (id + 1); i++)
 		for (int j = 0; j < n; j++)
 			for (int k = 0; k < n; k++)
 				C[i * n + j] += A[i * n + k] * B[j * n + k];
-	pthread_barrier_wait(&barrier);
 	return NULL;
 }
 
@@ -66,27 +76,16 @@ int main(int argc, char **argv)
 	memset(C, 0, sizeof(double) * n * n);
 
 	/*
-	 * El operando de mano derecha tiene que ser A pero almacenado por
-	 * columnas.
-	 */
-	for (int i = 0; i < n; i++)	
-		for (int j = 0; j < n; j++)	
-			B[i * n + j] = A[j * n + i];
-
-	/*
-	 * Creamos la barrera y los hilos.
+	 * Creamos y los hilos.
 	 * No se utiliza el primer elemento a propósito para dejar el código
 	 * más legible.
 	 */
 	pthread_barrier_init(&barrier, NULL, t);
-	for (int i = 1; i < t; i++)
-		pthread_create(threads + i, NULL, worker, ids + i);
-
-	/*
-	 * Hacemos la multiplicación convencional.
-	 */
 	ti = dwalltime();
-	worker(ids + 0);
+	for (int i = 0; i < t; i++)
+		pthread_create(threads + i, NULL, worker, ids + i);
+	for (int i = 0; i < t; i++)
+		pthread_join(threads[i], NULL);
 	tf = dwalltime();
 
 	bool ok = true;
@@ -100,7 +99,7 @@ int main(int argc, char **argv)
 	free(B);
 	free(C);
 	pthread_barrier_destroy(&barrier);
-	
+
 	return 0;
 }
 
