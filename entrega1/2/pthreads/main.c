@@ -12,7 +12,7 @@ double *AT, *BT, *CT, *ET, *FT, *UT;
 double *AA, *AAC;
 double *LB, *LBE;
 double *DU, *DUF;
-/* Promedios de U, L y B junto a sus mutexes*/ 
+/* Sumas de U, L y B junto a sus mutexes*/ 
 double up, lp, bp;
 pthread_mutex_t up_mutex, lp_mutex, bp_mutex;
 pthread_barrier_t barrier;
@@ -43,7 +43,7 @@ void multiply(double *C, const double * restrict B, const double * restrict A, i
 				C[i * n + j] += A[i * n + k] * B[j * n + k];
 }
 
-#warning Implementar
+#warning No implementado
 void transpose_upper(double * restrict dst, const double * restrict src, int n, int t, int id)
 {
 }
@@ -53,7 +53,7 @@ void transpose_upper(double * restrict dst, const double * restrict src, int n, 
  * Suma A y B, dejando el resultado en C. A y B deben estar almacenadas por
  * filas. C puede ser A o B.
  */
-void add(double *C, const double *B, const double *A, int n, int id)
+void add(double *C, const double *B, const double *A, int n, int t, int id)
 {
 }
 
@@ -86,10 +86,10 @@ void multiply_ll(double * restrict C, const double * restrict A, const double * 
 
 #warning No implementado
 /*
- * Calcula el producto A * B donde A es una matriz triangular superior.
+ * Calcula el producto A * B donde B es una matriz triangular superior.
  * El resultado se almacena en C. C != B != A.
  */
-void multiply_lu(double * restrict C, const double * restrict A, const double * restrict B, int n, int t, int id)
+void multiply_ru(double * restrict C, const double * restrict A, const double * restrict B, int n, int t, int id)
 {
 }
 
@@ -119,29 +119,43 @@ void *worker(void *idp)
 	/*  AA */
 	AA = C; /* Reutilizamos el espacio de C */
 	multiply(C, A, AT, n, t, id);
+	pthread_barrier_wait(&barrier);
 
 	/* AAC */
-	AAC =  A; /* Reutilizamos A */
+	AAC = A; /* Reutilizamos A */
 	multiply(AAC, AA, C, n, t, id);
 	
 	/* ulAAC */
 	scale(C, (up + lp) / (n * n * n * n), n * n, t, id);
+	pthread_barrier_wait(&barrier);
 
 	/* LB */
 	LB = C;  /* Reutilizamos el espacio de C de vuelta */
 	multiply_ll(LB, L, B, n, t, id);
+	pthread_barrier_wait(&barrier);
 
 	/* LBE */
 	LBE = B; /* Reutilizamos el espacio de B */
 	multiply(LBE, LB, E, n, t, id);
+	pthread_barrier_wait(&barrier);
 
 	/* DU */
 	DU = C; /* Reutilizamos el espacio de C */
-	multiply_lu(DU, D, U, n, t, id);
+	multiply_ru(DU, D, U, n, t, id);
+	pthread_barrier_wait(&barrier);
 
 	/* DUF */
-	DU = C; /* Reutilizamos el espacio de C */
+	DUF = E; /* Reutilizamos el espacio de C */
 	multiply(DUF, DU, F, n, t, id);
+	pthread_barrier_wait(&barrier);
+
+	/* b/(LBE + DUF) en el espacio de C */
+	add(C, LBE, DUF, n, t, id);
+	scale(C, bp / (n * n) , n, t, id);
+
+	/* Resultado final en A */
+	add(A, AAC, C, n, t, id);
+
 
 	return NULL;
 }
@@ -161,9 +175,6 @@ int main(int argc, char **argv)
 	/* Dimensión de bloque (en elementos) */
 	n = atoi(argv[2]);
 
-	A = malloc(sizeof(double) * n * n);
-	B = malloc(sizeof(double) * n * n);
-	C = malloc(sizeof(double) * n * n);
 
 	int ids[t];
 	pthread_t threads[t];
@@ -177,6 +188,25 @@ int main(int argc, char **argv)
 	pthread_mutex_init(&up_mutex, NULL);
 	pthread_mutex_init(&lp_mutex, NULL);
 	pthread_mutex_init(&bp_mutex, NULL);
+
+	/*
+	 * Reservamos memoria para las matrices A, B, C, D, E, F, L, U y para
+	 * la representación ordenada por columnas de A, B, C, E, F, U.
+	 */
+	A = malloc(sizeof(double) * n * n);
+	B = malloc(sizeof(double) * n * n);
+	C = malloc(sizeof(double) * n * n);
+	D = malloc(sizeof(double) * n * n);
+	E = malloc(sizeof(double) * n * n);
+	F = malloc(sizeof(double) * n * n);
+	L = malloc(sizeof(double) * (n * (n + 1) / 2));
+	U = malloc(sizeof(double) * (n * (n + 1) / 2));
+	AT = malloc(sizeof(double) * n * n);
+	BT = malloc(sizeof(double) * n * n);
+	CT = malloc(sizeof(double) * n * n);
+	ET = malloc(sizeof(double) * n * n);
+	FT = malloc(sizeof(double) * n * n);
+	UT = malloc(sizeof(double) * (n * (n + 1) / 2));
 
 	/*
 	 * Inicializamos la barrera y arrancamos los hilos.
@@ -200,6 +230,9 @@ int main(int argc, char **argv)
 	free(B);
 	free(C);
 	pthread_barrier_destroy(&barrier);
+	pthread_mutex_destroy(&up_mutex);
+	pthread_mutex_destroy(&lp_mutex);
+	pthread_mutex_destroy(&bp_mutex);
 
 	return 0;
 }
