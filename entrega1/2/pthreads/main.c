@@ -22,12 +22,15 @@ double dwalltime()
 }
 
 #warning Implementar
+/* 
+ * Traspone src, dejando el resultado en dst. src y dst deben ser distintos.
+ */
 void transpose(double * restrict dst, const double * restrict src, int n, int t, int id)
 {
 }
 
-#warning Implementar
-void multiply(double *C, const double *B, const double *A, int n, int t, int id)
+#warning No implementado
+void multiply(double *C, const double * restrict B, const double * restrict A, int n, int t, int id)
 {
 	int slice = n / t;
 	for (int i = id * slice; i < slice * (id + 1); i++)
@@ -36,18 +39,30 @@ void multiply(double *C, const double *B, const double *A, int n, int t, int id)
 				C[i * n + j] += A[i * n + k] * B[j * n + k];
 }
 
-#warning Implementar
+#warning No implementado
+/*
+ * Suma A y B, dejando el resultado en C. A y B deben estar almacenadas por
+ * filas.
+ */
 void add(double *C, const double *B, const double *A, int n, int id)
 {
 }
 
-#warning Implementar
+#warning No implementado
+/* 
+ * Multiplica cada elemento de A por factor. Deja el resultado directamente en
+ * A
+ */
 void scale(double *A, double factor, int n, int id)
 {
 }
 
-#warning Implementar
-void sum(const double *A, double *res, pthread_mutex_t *mutex,int n, int id)
+#warning No implementado
+/*
+ * Suma todos los elementos de A. Añade la suma a la variable res atómicamente,
+ * usando el mútex mutex.
+ */
+void sum(const double *A, double *res, pthread_mutex_t *mutex, int n, int id)
 {
 }
 
