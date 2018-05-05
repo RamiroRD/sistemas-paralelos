@@ -12,7 +12,7 @@ double *AT, *BT, *CT, *ET, *FT, *UT;
 double *AA, *AAC;
 double *LB, *LBE;
 double *DU, *DUF;
-/* Sumas de U, L y B junto a sus mutexes*/ 
+/* Sumas de U, L y B junto a sus mutexes*/
 double up, lp, bp;
 pthread_mutex_t up_mutex, lp_mutex, bp_mutex;
 pthread_barrier_t barrier;
@@ -26,7 +26,7 @@ double dwalltime()
 	return sec;
 }
 
-/* 
+/*
  * Traspone src, dejando el resultado en dst. src y dst deben ser distintos.
  */
 void transpose(double * restrict dst, const double * restrict src, int n, int t, int id)
@@ -61,7 +61,7 @@ void add(double *C, const double *A, const double *B, int n, int t, int id)
 		C[i] = A[i] + B[i];
 }
 
-/* 
+/*
  * Multiplica cada elemento de A por factor. Deja el resultado directamente en
  * A.
  */
@@ -112,12 +112,15 @@ void *worker(void *idp)
 
 	/* Promedio de u */
 	sum(U, &up, &up_mutex, n, id);
+	#TODO Se hizo solamente la suma? Faltaria la division.
 	pthread_barrier_wait(&barrier);
 	/* Promedio de l */
 	sum(L, &lp, &lp_mutex, n, id);
+	#TODO Se hizo solamente la suma? Faltaria la division.
 	pthread_barrier_wait(&barrier);
 	/* Promedio de b */
 	sum(L, &bp, &lp_mutex, n, id);
+	#TODO Se hizo solamente la suma? Faltaria la division.
 	pthread_barrier_wait(&barrier);
 
 	/* Transpuestas */
@@ -136,30 +139,30 @@ void *worker(void *idp)
 
 	/* AAC */
 	AAC = A; /* Reutilizamos A */
-	multiply(AAC, AA, C, n, t, id);
-	
+	multiply(AAC, AA, CT, n, t, id);
+
 	/* ulAAC */
-	scale(C, (up + lp) / (n * n * n * n), n * n, t, id);
+	scale(AAC, (up + lp) / (n * n * n * n), n * n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* LB */
 	LB = C;  /* Reutilizamos el espacio de C de vuelta */
-	multiply_ll(LB, L, B, n, t, id);
+	multiply_ll(LB, L, BT, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* LBE */
 	LBE = B; /* Reutilizamos el espacio de B */
-	multiply(LBE, LB, E, n, t, id);
+	multiply(LBE, LB, ET, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* DU */
 	DU = C; /* Reutilizamos el espacio de C */
-	multiply_ru(DU, D, U, n, t, id);
+	multiply_ru(DU, D, UT, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* DUF */
 	DUF = E; /* Reutilizamos el espacio de C */
-	multiply(DUF, DU, F, n, t, id);
+	multiply(DUF, DU, FT, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* b/(LBE + DUF) en el espacio de C */
@@ -244,4 +247,3 @@ int main(int argc, char **argv)
 
 	return 0;
 }
-
