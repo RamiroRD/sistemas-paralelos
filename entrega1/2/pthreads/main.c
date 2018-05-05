@@ -26,12 +26,15 @@ double dwalltime()
 	return sec;
 }
 
-#warning No implementado
 /* 
  * Traspone src, dejando el resultado en dst. src y dst deben ser distintos.
  */
 void transpose(double * restrict dst, const double * restrict src, int n, int t, int id)
 {
+	int slice = n / t;
+	for (int i = id * slice; i < slice * (id + 1); i++)
+		for (int j = 0; j < n; j++)
+			dst[i * n + j] = src[j * n + i];
 }
 
 void multiply(double *C, const double * restrict B, const double * restrict A, int n, int t, int id)
@@ -48,36 +51,45 @@ void transpose_upper(double * restrict dst, const double * restrict src, int n, 
 {
 }
 
-#warning No implementado
 /*
  * Suma A y B, dejando el resultado en C. A y B deben estar almacenadas por
  * filas. C puede ser A o B.
  */
-void add(double *C, const double *B, const double *A, int n, int t, int id)
+void add(double *C, const double *A, const double *B, int n, int t, int id)
 {
+	for (int i = id * (n * n) / t; i < (id + 1) * n * n / t; i++)
+		C[i] = A[i] + B[i];
 }
 
-#warning No implementado
 /* 
  * Multiplica cada elemento de A por factor. Deja el resultado directamente en
- * A
+ * A.
  */
-void scale(double *A, double factor, int n, int t, int id)
+void scale(double *A, double factor, int dim, int t, int id)
 {
+	for (int i = id * dim / t; i < (id + 1) * dim / t; i++)
+		A[i] *= factor;
 }
 
-#warning No implementado
 /*
  * Suma todos los elementos de A. Añade la suma a la variable res atómicamente,
  * usando el mútex mutex.
  */
 void sum(const double *A, double *res, pthread_mutex_t *mutex, int n, int id)
 {
+	double partial = 0;
+
+	for (int i = id * (n * n); i < (id + 1) * n * n; i++)
+		partial += A[i];
+	pthread_mutex_lock(mutex);
+	*res += partial;
+	pthread_mutex_unlock(mutex);
 }
 
 #warning No implementado
 /*
- * Calcula el producto A * B donde A es una matriz triangular inferior.
+ * Calcula el producto A * B donde A es una matriz triangular inferior ordenada
+ * por filas.
  * El resultado se almacena en C. C != B != A.
  */
 void multiply_ll(double * restrict C, const double * restrict A, const double * restrict B, int n, int t, int id)
@@ -86,7 +98,8 @@ void multiply_ll(double * restrict C, const double * restrict A, const double * 
 
 #warning No implementado
 /*
- * Calcula el producto A * B donde B es una matriz triangular superior.
+ * Calcula el producto A * B donde B es una matriz triangular superior ordenada
+ * por columnas.
  * El resultado se almacena en C. C != B != A.
  */
 void multiply_ru(double * restrict C, const double * restrict A, const double * restrict B, int n, int t, int id)
@@ -219,11 +232,6 @@ int main(int argc, char **argv)
 		pthread_join(threads[i], NULL);
 	tf = dwalltime();
 
-	bool ok = true;
-	for (int i = 0; i < n * n; i++)
-		ok = ok && C[i] == n;
-
-	fprintf(stderr, ok ? "OK\n" : "ERROR\n");
 	printf("T = %f [s]\n", tf - ti);
 
 	free(A);
