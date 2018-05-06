@@ -5,13 +5,23 @@
 #include <string.h>
 #include <stdbool.h>
 
+/* Defines para acceso a matrices triangulares */
+#define U_FIL(i,j) (i * n + j - i * ((i + 1)) / 2)
+#define U_COL(i,j) (i + (j*(j + 1)) / 2)
+#define L_FIL(i,j) (j + (i*(i + 1)) / 2)
+
+/* Cantidad de hilos y dimensión de matrices */
 int t, n;
+
+/* Matrices entrada y alguna de sus transpuestas */
 double *A, *B, *C, *D, *E, *F, *U, *L;
 double *AT, *BT, *CT, *ET, *FT, *UT;
-/* Intermedios */
+
+/* Matrices intermedias. No se reservan memoria exclusiva para estos*/
 double *AA, *AAC;
 double *LB, *LBE;
 double *DU, *DUF;
+
 /* Sumas de U, L y B junto a sus mutexes*/
 double up, lp, bp;
 pthread_mutex_t up_mutex, lp_mutex, bp_mutex;
@@ -53,10 +63,16 @@ void transpose(double * restrict dst, const double * restrict src, int n, int t,
 void multiply(double *C, const double * restrict B, const double * restrict A, int n, int t, int id)
 {
 	int slice = n / t;
+
+	/* Inicializamos en cero */
+	memset(C + id * slice, 0, sizeof(double) * slice * n);
+
+	/* Multiplicación convencional fila * columna */
 	for (int i = id * slice; i < slice * (id + 1); i++)
 		for (int j = 0; j < n; j++)
 			for (int k = 0; k < n; k++)
 				C[i * n + j] += A[i * n + k] * B[j * n + k];
+
 }
 
 #warning No implementado
@@ -140,15 +156,12 @@ void *worker(void *idp)
 
 	/* Promedio de u */
 	sum(U, &up, &up_mutex, n, id);
-	#TODO Se hizo solamente la suma? Faltaria la division.
 	pthread_barrier_wait(&barrier);
 	/* Promedio de l */
 	sum(L, &lp, &lp_mutex, n, id);
-	#TODO Se hizo solamente la suma? Faltaria la division.
 	pthread_barrier_wait(&barrier);
 	/* Promedio de b */
 	sum(L, &bp, &lp_mutex, n, id);
-	#TODO Se hizo solamente la suma? Faltaria la division.
 	pthread_barrier_wait(&barrier);
 
 	/* Transpuestas */
