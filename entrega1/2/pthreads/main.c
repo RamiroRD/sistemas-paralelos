@@ -26,6 +26,19 @@ double dwalltime()
 	return sec;
 }
 
+void locate(int * i, int * j, int n, int opt_pos)
+{
+	int row = 0;
+	int count = n;
+	while (count < opt_pos)
+	{
+		row++;
+		count = count + (count - 1);
+	}
+	*i = row;
+	*j = n * row - (count - opt_pos);
+}
+
 /*
  * Traspone src, dejando el resultado en dst. src y dst deben ser distintos.
  */
@@ -49,6 +62,21 @@ void multiply(double *C, const double * restrict B, const double * restrict A, i
 #warning No implementado
 void transpose_upper(double * restrict dst, const double * restrict src, int n, int t, int id)
 {
+	int slice = ((n + 1) / 2) / t;
+	int count = 0;
+	int opt_pos = id * slice;
+	int i, j;
+	locate(&i, &j, n, opt_pos);
+	while ((count < slice) && (i < n))
+	{
+		while ((count < slice) && (j < n))
+		{
+			dst[i + (j * (j + 1) / 2)] = src[i * n + j - (i * (i + 1) / 2)];
+			count++;
+		}
+		i++;
+		j = i;
+	}
 }
 
 /*
@@ -240,6 +268,17 @@ int main(int argc, char **argv)
 	free(A);
 	free(B);
 	free(C);
+	free(D);
+	free(E);
+	free(F);
+	free(L);
+	free(U);
+	free(AT);
+	free(BT);
+	free(CT);
+	free(ET);
+	free(FT);
+	free(UT);
 	pthread_barrier_destroy(&barrier);
 	pthread_mutex_destroy(&up_mutex);
 	pthread_mutex_destroy(&lp_mutex);
