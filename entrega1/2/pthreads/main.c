@@ -36,6 +36,10 @@ double dwalltime()
 	return sec;
 }
 
+/*
+ *	Halla la posición (i,j) que el elemento ubicado en la posición opt_pos
+ *	tendría si la matriz no estuviera alocada optimizando el uso de la memoria.
+ */
 void unoptimized_pos(int * i, int * j, int n, int opt_pos)
 {
 	int row = 0;
@@ -81,6 +85,7 @@ void transpose_upper(double * restrict dst, const double * restrict src, int n, 
 	/* Cantidad de elemtos que corresponden al hilo: slice = total_elem / t */
 	int slice =	(n * (n + 1) / 2) / t;
 	int count = 0;
+	/* Posición real en la matriz "optimizada en memoria" del primer elemento a transponer por este hilo */
 	int opt_pos = id * slice;
 	int i, j;
 	unoptimized_pos(&i, &j, n, opt_pos);
@@ -131,7 +136,6 @@ void sum(const double *A, double *res, pthread_mutex_t *mutex, int n, int id)
 	pthread_mutex_unlock(mutex);
 }
 
-#warning No implementado
 /*
  * Calcula el producto A * B donde A es una matriz triangular inferior ordenada
  * por filas.
@@ -139,9 +143,20 @@ void sum(const double *A, double *res, pthread_mutex_t *mutex, int n, int id)
  */
 void multiply_ll(double * restrict C, const double * restrict A, const double * restrict B, int n, int t, int id)
 {
+	int slice = n / t;
+
+	/* Inicializamos en cero */
+	memset(C + id * slice, 0, sizeof(double) * slice * n);
+
+	/* Multiplicación convencional fila * columna */
+	for (int i = id * slice; i < slice * (id + 1); i++)
+		for (int j = 0; j < n; j++)
+			/* Cuando k > i los elementos de A valen 0, por lo tanto se deja de sumar. */
+			for (int k = 0; k <= i; k++)
+				C[i * n + j] += A[L_FIL(i,k)] * B[j * n + k];
+
 }
 
-#warning No implementado
 /*
  * Calcula el producto A * B donde B es una matriz triangular superior ordenada
  * por columnas.
@@ -149,6 +164,18 @@ void multiply_ll(double * restrict C, const double * restrict A, const double * 
  */
 void multiply_ru(double * restrict C, const double * restrict A, const double * restrict B, int n, int t, int id)
 {
+	int slice = n / t;
+
+	/* Inicializamos en cero */
+	memset(C + id * slice, 0, sizeof(double) * slice * n);
+
+	/* Multiplicación convencional fila * columna */
+	for (int i = id * slice; i < slice * (id + 1); i++)
+		for (int j = 0; j < n; j++)
+			/* Cuando k > j los elementos de B valen 0, por lo tanto se deja de sumar. */
+			for (int k = 0; k <= j; k++)
+					C[i * n + j] += A[i * n + k] * B[U_COL(k,j)];
+
 }
 
 void *worker(void *idp)
