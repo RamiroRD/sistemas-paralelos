@@ -6,9 +6,9 @@
 #include <stdbool.h>
 
 /* Defines para acceso a matrices triangulares */
-#define U_FIL(i,j) (i * n + j - i * ((i + 1)) / 2)
-#define U_COL(i,j) (i + (j*(j + 1)) / 2)
-#define L_FIL(i,j) (j + (i*(i + 1)) / 2)
+#define U_FIL(i,j) (i * n + j - (i * (i + 1)) / 2)
+#define U_COL(i,j) (i + (j * (j + 1)) / 2)
+#define L_FIL(i,j) (j + (i * (i + 1)) / 2)
 
 /* Cantidad de hilos y dimensión de matrices */
 int t, n;
@@ -36,7 +36,7 @@ double dwalltime()
 	return sec;
 }
 
-void locate(int * i, int * j, int n, int opt_pos)
+void unoptimized_pos(int * i, int * j, int n, int opt_pos)
 {
 	int row = 0;
 	int count = n;
@@ -78,16 +78,17 @@ void multiply(double *C, const double * restrict B, const double * restrict A, i
 #warning No implementado
 void transpose_upper(double * restrict dst, const double * restrict src, int n, int t, int id)
 {
-	int slice = ((n + 1) / 2) / t;
+	/* Cantidad de elemtos que corresponden al hilo: slice = total_elem / t */
+	int slice =	(n * (n + 1) / 2) / t;
 	int count = 0;
 	int opt_pos = id * slice;
 	int i, j;
-	locate(&i, &j, n, opt_pos);
+	unoptimized_pos(&i, &j, n, opt_pos);
 	while ((count < slice) && (i < n))
 	{
 		while ((count < slice) && (j < n))
 		{
-			dst[i + (j * (j + 1) / 2)] = src[i * n + j - (i * (i + 1) / 2)];
+			dst[U_COL(i,j)] = src[U_FIL(i,j)];
 			count++;
 		}
 		i++;
