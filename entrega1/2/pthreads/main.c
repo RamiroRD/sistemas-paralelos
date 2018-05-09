@@ -396,8 +396,11 @@ int main(int argc, char **argv)
 			fprintf(stderr, "ERROR\n");
 	}
 
-
-	/* TODO: ver bien que liberar y que no. */
+	/*
+	 * Estos punteros no cambiaron nunca desde el malloc. Siguen apuntando
+	 * a sus respectivas regiones de memorias. Con lo que no hay problema
+	 * en hacer free() sobre cada uno de estos.
+	 */
 	free(A);
 	free(B);
 	free(C);
