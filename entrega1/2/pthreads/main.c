@@ -4,6 +4,9 @@
 #include <sys/time.h>
 #include <string.h>
 #include <stdbool.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <math.h>
 
 /* Defines para acceso a matrices triangulares */
 #define U_FIL(i,j) (i * n + j - (i * (i + 1)) / 2)
@@ -17,7 +20,13 @@ int t, n;
 double *A, *B, *C, *D, *E, *F, *U, *L;
 double *AT, *BT, *CT, *ET, *FT, *UT;
 
-/* Matrices intermedias. No se reservan memoria exclusiva para estos*/
+/* Puntero a resultado final */
+double *result;
+
+/* Matriz con el resultado dado como entrada */
+double *given_result;
+
+/* Matrices intermedias. No se reservan memoria exclusiva para estos. */
 double *AA, *AAC;
 double *LB, *LBE;
 double *DU, *DUF;
@@ -240,18 +249,65 @@ void *worker(void *idp)
 
 	/* Resultado final en A */
 	add(A, AAC, C, n, t, id);
+	result = A;
 
 
 	return NULL;
 }
+
+void load(const char *file)
+{
+	int fd = open(file, O_RDONLY);
+	if (fd < 1) {
+		perror("load");
+		exit(-1);
+	}
+	read(fd, A, n * n * sizeof(double));
+	read(fd, B, n * n * sizeof(double));
+	read(fd, C, n * n * sizeof(double));
+	read(fd, D, n * n * sizeof(double));
+	read(fd, E, n * n * sizeof(double));
+	read(fd, F, n * n * sizeof(double));
+
+	double *ptr = L;
+	for (int i = 1; i <= n; i++) {
+		read(fd, ptr, i * sizeof(double));
+		ptr += i;
+		lseek(fd, (n - i) * sizeof(double), SEEK_CUR);
+	}
+
+	ptr = U;
+	for (int i = n; i >= 1; i--) {
+		lseek(fd, (n - i) * sizeof(double), SEEK_CUR);
+		read(fd, ptr, i * sizeof(double));
+		ptr += i;
+	}
+
+	read(fd, given_result, n * n * sizeof(double));
+}
+
+/*
+ * Compara las matrices A y B con una tolerancia epsilon. A y B deben estar 
+ * almacenadas de la misma forma.
+ */
+bool compare(double *A, double *B, int n, double epsilon)
+{
+	for (int i = 0; i < n * n; i++) {
+		if (fabs(A - B) > epsilon)
+			return false;
+	}
+
+	return true;
+}
+
 
 int main(int argc, char **argv)
 {
 	/* Tiempos */
 	double ti, tf;
 
-	if (argc != 3) {
-		printf("producto T n\n");
+	if (argc != 4) {
+		printf("producto T n archivo\n");
 		return -1;
 	}
 
@@ -292,6 +348,9 @@ int main(int argc, char **argv)
 	ET = malloc(sizeof(double) * n * n);
 	FT = malloc(sizeof(double) * n * n);
 	UT = malloc(sizeof(double) * (n * (n + 1) / 2));
+	given_result = malloc(sizeof(double) * n * n);
+
+	load(argv[3]);
 
 	/*
 	 * Inicializamos la barrera y arrancamos los hilos.
@@ -305,6 +364,11 @@ int main(int argc, char **argv)
 	tf = dwalltime();
 
 	printf("T = %f [s]\n", tf - ti);
+
+	if (compare(given_result, result, n, 0.1))
+		printf("OK\n");
+	else
+		printf("ERROR\n");
 
 	free(A);
 	free(B);
@@ -320,6 +384,7 @@ int main(int argc, char **argv)
 	free(ET);
 	free(FT);
 	free(UT);
+	free(given_result);
 	pthread_barrier_destroy(&barrier);
 	pthread_mutex_destroy(&up_mutex);
 	pthread_mutex_destroy(&lp_mutex);
