@@ -24,22 +24,20 @@ int main(int argc, char **argv)
 	/* Tiempos */
 	double ti, tf;
 
-	if (argc != 3) {
-		printf("pares T N\n");
+	if (argc != 2) {
+		printf("pares N\n");
 		return -1;
 	}
 
-	/* Cantidad de hilos */
-	t = atoi(argv[1]);
 	/* Dimensión del arreglo */
-	n = strtoll(argv[2], NULL, 10);
+	n = strtoll(argv[1], NULL, 10);
 	if (errno == ERANGE) {
 		printf("Fuera de rango.\n");
 		return -1;
 	}
 
 
-	printf("Alocando %f MiB...\n", n / 1048576.0);
+	printf("Alocando %f MiB...\n", sizeof(int) * n / 1048576.0);
 	V = malloc(sizeof(int) * n);
 	if (!V) {
 		perror("malloc");
@@ -54,7 +52,7 @@ int main(int argc, char **argv)
 
 	uint64_t pares = 0;
 	for (uint64_t i = 0; i < n; i++)
-		if(V[i] % 2 == 0)
+		if((V[i] & 1) == 0)
 			pares++;
 
 	tf = dwalltime();

@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 	}
 
 
-	printf("Alocando %f MiB...\n", n / 1048576.0);
+	printf("Alocando %f MiB...\n", sizeof(int) * n / 1048576.0);
 	V = malloc(sizeof(int) * n);
 	if (!V) {
 		perror("malloc");
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 	uint64_t pares = 0;
 #pragma omp parallel for reduction(+:pares)
 	for (uint64_t i = 0; i < n; i++)
-		if(V[i] % 2 == 0)
+		if((V[i] & 1) == 0)
 			pares++;
 
 	tf = dwalltime();
