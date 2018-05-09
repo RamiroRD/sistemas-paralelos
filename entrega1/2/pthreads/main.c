@@ -13,6 +13,8 @@
 #define U_COL(i,j) (i + (j * (j + 1)) / 2)
 #define L_FIL(i,j) (j + (i * (i + 1)) / 2)
 
+bool use_file;
+
 /* Cantidad de hilos y dimensión de matrices */
 int t, n;
 
@@ -284,6 +286,8 @@ void load(const char *file)
 	}
 
 	read(fd, given_result, n * n * sizeof(double));
+
+	close(fd);
 }
 
 /*
@@ -306,10 +310,12 @@ int main(int argc, char **argv)
 	/* Tiempos */
 	double ti, tf;
 
-	if (argc != 4) {
-		printf("producto T n archivo\n");
+	if (argc != 3 && argc != 4) {
+		printf("producto T n [archivo]\n");
 		return -1;
 	}
+
+	use_file = argc == 4;
 
 	/* Cantidad de hilos */
 	t = atoi(argv[1]);
@@ -350,7 +356,9 @@ int main(int argc, char **argv)
 	UT = malloc(sizeof(double) * (n * (n + 1) / 2));
 	given_result = malloc(sizeof(double) * n * n);
 
-	load(argv[3]);
+	if (use_file)
+		load(argv[3]);
+	/* Si no hay archivo, operamos con basura */
 
 	/*
 	 * Inicializamos la barrera y arrancamos los hilos.
@@ -365,10 +373,12 @@ int main(int argc, char **argv)
 
 	printf("T = %f [s]\n", tf - ti);
 
-	if (compare(given_result, result, n, 0.1))
-		printf("OK\n");
-	else
-		printf("ERROR\n");
+	if (use_file) {
+		if (compare(given_result, result, n, 0.1))
+			printf("OK\n");
+		else
+			printf("ERROR\n");
+	}
 
 	free(A);
 	free(B);
@@ -392,3 +402,4 @@ int main(int argc, char **argv)
 
 	return 0;
 }
+
