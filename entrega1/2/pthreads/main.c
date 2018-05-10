@@ -112,6 +112,47 @@ void sum(const double *A, double *res, pthread_mutex_t * mutex, int n,
 	pthread_mutex_unlock(mutex);
 }
 
+/*
+ * Suma todos los elementos de A donde A es una matriz triangular superior
+ * ordenada por columnas.
+ * Añade la suma a la variable res atómicamente, usando el mútex mutex.
+ */
+void sum_upper(const double *A, double *res, pthread_mutex_t * mutex,
+	       int n, int id)
+{
+	double partial = 0;
+	int slice = n / t;
+
+	for (int j = id * slice; j < slice * (id + 1); j++)
+		for (int i = 0; i <= j; i++)
+			partial += A[U_COL(i, j)];
+
+	pthread_mutex_lock(mutex);
+	*res += partial;
+	pthread_mutex_unlock(mutex);
+}
+
+/*
+ * Suma todos los elementos de A donde A es una matriz triangular inferior
+ * ordenada por filas.
+ * Añade la suma a la variable res atómicamente, usando el mútex mutex.
+ */
+void sum_lower(const double *A, double *res, pthread_mutex_t * mutex,
+	       int n, int id)
+{
+	double partial = 0;
+	int slice = n / t;
+
+	for (int i = id * slice; i < slice * (id + 1); i++)
+		for (int j = 0; j <= i; j++)
+			partial += A[L_FIL(i, j)];
+
+
+	pthread_mutex_lock(mutex);
+	*res += partial;
+	pthread_mutex_unlock(mutex);
+}
+
 void multiply(double *C, const double *restrict A,
 	      const double *restrict B, int n, int t, int id)
 {
@@ -123,7 +164,7 @@ void multiply(double *C, const double *restrict A,
 		for (int j = 0; j < n; j++) {
 			c = 0;
 			for (int k = 0; k < n; k++) {
-				    c += A[i * n + k] * B[j * n + k];
+				c += A[i * n + k] * B[j * n + k];
 			}
 			C[i * n + j] = c;
 		}
@@ -190,11 +231,11 @@ void *worker(void *idp)
 	const int size = n * n;
 
 	/* Promedio de u */
-	sum(U, &sum_u, &up_mutex, n, id);
+	sum_upper(U, &sum_u, &up_mutex, n, id);
 	pthread_barrier_wait(&barrier);
 	avg_u = sum_u / size;
 	/* Promedio de l */
-	sum(L, &sum_l, &lp_mutex, n, id);
+	sum_lower(L, &sum_l, &lp_mutex, n, id);
 	pthread_barrier_wait(&barrier);
 	avg_l = sum_l / size;
 	/* Promedio de b */
@@ -432,4 +473,3 @@ int main(int argc, char **argv)
 
 	return 0;
 }
-
