@@ -116,7 +116,7 @@ void sum(const double *A, double *res, pthread_mutex_t * mutex, int n,
 	double partial = 0;
 	int slice = n * n / t;
 
-	for (int i = slice / t; i < (id + 1) * slice / t; i++)
+	for (int i = id * slice / t; i < (id + 1) * slice / t; i++)
 		partial += A[i];
 
 	pthread_mutex_lock(mutex);
