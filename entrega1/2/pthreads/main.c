@@ -193,7 +193,7 @@ void multiply_ll(double *restrict C, const double *restrict A,
 			for (int k = 0; k <= i; k++)
 				c += A[L_FIL(i, k)] * B[j * n + k];
 
-			C[i * n + j] += c;
+			C[i * n + j] = c;
 		}
 	}
 }
@@ -358,7 +358,7 @@ void ones()
 bool compare(double *A, double *B, int n, double epsilon)
 {
 	for (int i = 0; i < n * n; i++) {
-		if (fabs(A - B) > epsilon)
+		if (fabs(A[i] - B[i]) > epsilon)
 			return false;
 	}
 
