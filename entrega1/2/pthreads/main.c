@@ -54,9 +54,11 @@ void transpose(double *restrict dst, const double *restrict src, int n,
 	       int t, int id)
 {
 	int slice = n / t;
-	for (int i = id * slice; i < slice * (id + 1); i++)
-		for (int j = 0; j < n; j++)
-			dst[i * n + j] = src[j * n + i];
+
+	for (int j = id * slice; j < slice * (id + 1); j++)
+		for (int i = 0; i < n; i++)
+			dst[j * n + i] = src[i * n + j];
+
 }
 
 void multiply(double *C, const double *restrict B,
