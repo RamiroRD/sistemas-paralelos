@@ -4,6 +4,9 @@
 #include <sys/time.h>
 #include <string.h>
 #include <stdbool.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <math.h>
 
 /* Defines para acceso a matrices triangulares */
 #define U_FIL(i,j) (i * n + j - (i * (i + 1)) / 2)
@@ -25,6 +28,12 @@ double *DU, *DUF;
 /* Sumas de U, L y B */
 double up, lp, bp;
 
+bool use_file;
+/* Puntero a resultado final */
+double *result;
+
+/* Matriz con el resultado dado como entrada */
+double *given_result;
 
 double dwalltime()
 {
@@ -40,7 +49,7 @@ double dwalltime()
  */
 void transpose(double * restrict dst, const double * restrict src, int n)
 {
-  #pragma omp for
+  #pragma omp parallel for
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++)
 			dst[i * n + j] = src[j * n + i];
@@ -49,18 +58,20 @@ void transpose(double * restrict dst, const double * restrict src, int n)
 void multiply(double *C, const double * restrict B, const double * restrict A, int n)
 {
 	/* Multiplicación convencional fila * columna */
-  #pragma omp for
+  #pragma omp parallel for
   for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++)
+		{
       double partial = 0;
 			for (int k = 0; k < n; k++)
 				partial += A[i * n + k] * B[j * n + k];
 			C[i * n + j] = partial;
+		}
 }
-#TODO hacerlo
+
 void transpose_upper(double * restrict dst, const double * restrict src, int n)
 {
-	#pragma omp for
+	#pragma omp parallel for
 	for (int i = 0; i < n; i++)
 		for (int j = i; j < n; j++)
 			dst[U_COL(i,j)] = src[U_FIL(i,j)];
@@ -73,7 +84,7 @@ void transpose_upper(double * restrict dst, const double * restrict src, int n)
  */
 void add(double *C, const double *A, const double *B, int n)
 {
-  #pragma omp for
+  #pragma omp parallel for
 	for (int i = 0; i < n * n; i++)
 		C[i] = A[i] + B[i];
 }
@@ -84,19 +95,18 @@ void add(double *C, const double *A, const double *B, int n)
  */
 void scale(double *A, double factor, int dim)
 {
-  #pragma omp for
+  #pragma omp parallel for
 	for (int i = 0; i < dim; i++)
 		A[i] *= factor;
 }
 
 /*
- * Suma todos los elementos de A. Añade la suma a la variable res atómicamente,
- * usando el mútex mutex.
+ * Suma todos los elementos de A.
  */
-void sum(const double *A, double *res, pthread_mutex_t *mutex, int n)
+void sum(const double *A, double *res, int n)
 {
 	double partial = 0;
-  #pragma omp for reduction(+:partial)
+  #pragma omp parallel for reduction(+:partial)
 	for (int i = 0; i < n * n; i++)
 		partial += A[i];
 	*res = partial;
@@ -110,7 +120,7 @@ void sum(const double *A, double *res, pthread_mutex_t *mutex, int n)
 void multiply_ll(double * restrict C, const double * restrict A, const double * restrict B, int n)
 {
   /* Multiplicación convencional fila * columna */
-  #pragma omp for
+  #pragma omp parallel for
   for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++)
     {
@@ -120,7 +130,6 @@ void multiply_ll(double * restrict C, const double * restrict A, const double * 
 			 partial += A[L_FIL(i,k)] * B[j * n + k];
 			C[i * n + j] = partial;
     }
-
 }
 
 /*
@@ -131,7 +140,7 @@ void multiply_ll(double * restrict C, const double * restrict A, const double * 
 void multiply_ru(double * restrict C, const double * restrict A, const double * restrict B, int n)
 {
 	/* Multiplicación convencional fila * columna */
-  #pragma omp for
+  #pragma omp parallel for
   for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++)
     {
@@ -141,7 +150,74 @@ void multiply_ru(double * restrict C, const double * restrict A, const double * 
 				 partial += A[i * n + k] * B[U_COL(k,j)];
 			C[i * n + j] = partial;
     }
+}
 
+
+void load(const char *file)
+{
+	int fd = open(file, O_RDONLY);
+	if (fd < 1) {
+		perror("load");
+		exit(-1);
+	}
+	read(fd, A, n * n * sizeof(double));
+	read(fd, B, n * n * sizeof(double));
+	read(fd, C, n * n * sizeof(double));
+	read(fd, D, n * n * sizeof(double));
+	read(fd, E, n * n * sizeof(double));
+	read(fd, F, n * n * sizeof(double));
+
+	double *ptr = L;
+	for (int i = 1; i <= n; i++) {
+		read(fd, ptr, i * sizeof(double));
+		ptr += i;
+		lseek(fd, (n - i) * sizeof(double), SEEK_CUR);
+	}
+
+	ptr = U;
+	for (int i = n; i >= 1; i--) {
+		lseek(fd, (n - i) * sizeof(double), SEEK_CUR);
+		read(fd, ptr, i * sizeof(double));
+		ptr += i;
+	}
+
+	read(fd, given_result, n * n * sizeof(double));
+
+	close(fd);
+}
+
+/*
+ * Inicializa todas las matrices en 1.
+ */
+void ones()
+{
+	const size_t size = n * n * sizeof(double);
+	const size_t tsize = (n * (n + 1)) / 2 * sizeof(double);
+
+	for (int i = 0; i < n * n; i++)
+		A[i] = 1;
+
+	memcpy(B, A, size);
+	memcpy(C, A, size);
+	memcpy(D, A, size);
+	memcpy(E, A, size);
+	memcpy(F, A, size);
+	memcpy(L, A, tsize);
+	memcpy(U, A, tsize);
+}
+
+/*
+ * Compara las matrices A y B con una tolerancia epsilon. A y B deben estar
+ * almacenadas de la misma forma.
+ */
+bool compare(double *A, double *B, int n, double epsilon)
+{
+	for (int i = 0; i < n * n; i++) {
+		if (fabs(A[i] - B[i]) > epsilon)
+			return false;
+	}
+
+	return true;
 }
 
 int main(int argc, char **argv)
@@ -149,11 +225,12 @@ int main(int argc, char **argv)
 	/* Tiempos */
 	double ti, tf;
 
-	if (argc != 3) {
-		printf("producto T n\n");
+	if (argc != 3 && argc != 4) {
+		printf("producto T n [archivo]\n");
 		return -1;
 	}
 
+	use_file = argc == 4;
 	/* Cantidad de hilos */
 	t = atoi(argv[1]);
 	/* Dimensión de bloque (en elementos) */
@@ -177,16 +254,23 @@ int main(int argc, char **argv)
 	ET = malloc(sizeof(double) * n * n);
 	FT = malloc(sizeof(double) * n * n);
 	UT = malloc(sizeof(double) * (n * (n + 1) / 2));
+	given_result = malloc(sizeof(double) * n * n);
 
 	/*
-	 * Inicializamos arrancamos los hilos.
+	 * Si se pasa un archivo, usar para cargar la matrices. Si no,
+	 * inicializarlas en 1.
 	 */
-
-  omp_set_num_threads(t);
+	if (use_file)
+		load(argv[3]);
+	else
+		ones();
 
 	ti = dwalltime();
 
-  #pragma omp parallel {
+	/*
+	* Inicializamos los hilos.
+	*/
+	omp_set_num_threads(t);
 
   /* Promedio de u */
 	sum(U, &up, n);
@@ -246,11 +330,18 @@ int main(int argc, char **argv)
 
 	/* Resultado final en A */
 	add(A, AAC, C, n);
+	#pragma omp barrier
 
-  }
 	tf = dwalltime();
 
 	printf("T = %f [s]\n", tf - ti);
+
+	if (use_file) {
+		if (compare(given_result, result, n, 0.1))
+			fprintf(stderr, "OK\n");
+		else
+			fprintf(stderr, "ERROR\n");
+	}
 
 	free(A);
 	free(B);
@@ -266,6 +357,7 @@ int main(int argc, char **argv)
 	free(ET);
 	free(FT);
 	free(UT);
+	free(given_result);
 
 	return 0;
 }
