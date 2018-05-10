@@ -35,7 +35,7 @@ double *DU, *DUF;
 double *LBEpDUF;
 
 /* Sumas de U, L y B junto a sus mutexes*/
-double sum_u, sum_l, sum_b;
+double sum_u = 0, sum_l = 0, sum_b = 0;
 pthread_mutex_t up_mutex, lp_mutex, bp_mutex;
 pthread_barrier_t barrier;
 
@@ -112,8 +112,8 @@ void sum(const double *A, double *res, pthread_mutex_t * mutex, int n,
 	pthread_mutex_unlock(mutex);
 }
 
-void multiply(double *C, const double *restrict B,
-	      const double *restrict A, int n, int t, int id)
+void multiply(double *C, const double *restrict A,
+	      const double *restrict B, int n, int t, int id)
 {
 	int slice = n / t;
 	double c;
@@ -219,6 +219,7 @@ void *worker(void *idp)
 	/* AAC */
 	AAC = A;		/* Reutilizamos A */
 	multiply(AAC, AA, CT, n, t, id);
+	pthread_barrier_wait(&barrier);
 
 	/* ulAAC */
 	scale(AAC, avg_u * avg_l, n, t, id);
