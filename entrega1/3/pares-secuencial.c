@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <sys/time.h>
 #include <string.h>
 #include <stdbool.h>
@@ -51,12 +50,9 @@ int main(int argc, char **argv)
 	for (uint64_t i = 0; i < n; i++)
 		V[i] = i;
 
-	omp_set_num_threads(t);
-
 	ti = dwalltime();
 
 	uint64_t pares = 0;
-#pragma omp parallel for reduction(+:pares)
 	for (uint64_t i = 0; i < n; i++)
 		if(V[i] % 2 == 0)
 			pares++;

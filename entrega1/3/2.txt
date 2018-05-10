@@ -1,0 +1,24 @@
+10000
+100000
+1000000
+10000000
+100000000
+1000000000
+Alocando 0.009537 MiB...
+T = 0.000167 [s]
+Cantidad de pares: 5000
+Alocando 0.095367 MiB...
+T = 0.000388 [s]
+Cantidad de pares: 50000
+Alocando 0.953674 MiB...
+T = 0.003029 [s]
+Cantidad de pares: 500000
+Alocando 9.536743 MiB...
+T = 0.011533 [s]
+Cantidad de pares: 5000000
+Alocando 95.367432 MiB...
+T = 0.112923 [s]
+Cantidad de pares: 50000000
+Alocando 953.674316 MiB...
+T = 1.131815 [s]
+Cantidad de pares: 500000000

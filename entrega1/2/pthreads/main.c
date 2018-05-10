@@ -48,23 +48,6 @@ double dwalltime()
 }
 
 /*
- *	Halla la posición (i,j) que el elemento ubicado en la posición opt_pos
- *	tendría si la matriz no estuviera alocada optimizando el uso de la memoria.
- */
-void unoptimized_pos(int * i, int * j, int n, int opt_pos)
-{
-	int row = 0;
-	int count = n;
-	while (count < opt_pos)
-	{
-		row++;
-		count = count + (count - 1);
-	}
-	*i = row;
-	*j = n * row - (count - opt_pos);
-}
-
-/*
  * Traspone src, dejando el resultado en dst. src y dst deben ser distintos.
  */
 void transpose(double * restrict dst, const double * restrict src, int n, int t, int id)
@@ -90,26 +73,14 @@ void multiply(double *C, const double * restrict B, const double * restrict A, i
 
 }
 
-#warning No implementado
 void transpose_upper(double * restrict dst, const double * restrict src, int n, int t, int id)
 {
 	/* Cantidad de elemtos que corresponden al hilo: slice = total_elem / t */
-	int slice =	(n * (n + 1) / 2) / t;
-	int count = 0;
-	/* Posición real en la matriz "optimizada en memoria" del primer elemento a transponer por este hilo */
-	int opt_pos = id * slice;
-	int i, j;
-	unoptimized_pos(&i, &j, n, opt_pos);
-	while ((count < slice) && (i < n))
-	{
-		while ((count < slice) && (j < n))
-		{
-			dst[U_COL(i,j)] = src[U_FIL(i,j)];
-			count++;
-		}
-		i++;
-		j = i;
-	}
+	int slice = n / t;
+	for (int i = id * slice; i < slice * (id + 1); i++)
+		for (int j = i; j < n; j++)
+			dst[U_COL(i, j)] =  src[U_FIL(i, j)];
+			
 }
 
 /*
@@ -156,16 +127,17 @@ void multiply_ll(double * restrict C, const double * restrict A, const double * 
 {
 	int slice = n / t;
 
-	/* Inicializamos en cero */
-	memset(C + id * slice, 0, sizeof(double) * slice * n);
-
 	/* Multiplicación convencional fila * columna */
-	for (int i = id * slice; i < slice * (id + 1); i++)
-		for (int j = 0; j < n; j++)
+	for (int i = id * slice; i < slice * (id + 1); i++) {
+		for (int j = 0; j < n; j++) {
 			/* Cuando k > i los elementos de A valen 0, por lo tanto se deja de sumar. */
-			for (int k = 0; k <= i; k++)
-				C[i * n + j] += A[L_FIL(i,k)] * B[j * n + k];
-
+			double c = 0;
+			for (int k = 0; k <= i; k++) {
+				c += A[L_FIL(i,k)] * B[j * n + k];
+			}
+			C[i * n + j] += c;
+		}
+	}
 }
 
 /*
@@ -177,16 +149,17 @@ void multiply_ru(double * restrict C, const double * restrict A, const double * 
 {
 	int slice = n / t;
 
-	/* Inicializamos en cero */
-	memset(C + id * slice, 0, sizeof(double) * slice * n);
-
 	/* Multiplicación convencional fila * columna */
-	for (int i = id * slice; i < slice * (id + 1); i++)
-		for (int j = 0; j < n; j++)
+	for (int i = id * slice; i < slice * (id + 1); i++) {
+		for (int j = 0; j < n; j++) {
+			double c = 0;
 			/* Cuando k > j los elementos de B valen 0, por lo tanto se deja de sumar. */
-			for (int k = 0; k <= j; k++)
-					C[i * n + j] += A[i * n + k] * B[U_COL(k,j)];
-
+			for (int k = 0; k <= j; k++) {
+				c += A[i * n + k] * B[U_COL(k,j)];
+			}
+			C[i * n + j] = c;
+		}
+	}
 }
 
 void *worker(void *idp)
