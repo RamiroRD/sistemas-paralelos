@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <sys/time.h>
 #include <string.h>
 #include <stdbool.h>
@@ -25,15 +24,13 @@ int main(int argc, char **argv)
 	/* Tiempos */
 	double ti, tf;
 
-	if (argc != 3) {
-		printf("pares T N\n");
+	if (argc != 2) {
+		printf("pares N\n");
 		return -1;
 	}
 
-	/* Cantidad de hilos */
-	t = atoi(argv[1]);
 	/* Dimensión del arreglo */
-	n = strtoll(argv[2], NULL, 10);
+	n = strtoll(argv[1], NULL, 10);
 	if (errno == ERANGE) {
 		printf("Fuera de rango.\n");
 		return -1;
@@ -51,12 +48,9 @@ int main(int argc, char **argv)
 	for (uint64_t i = 0; i < n; i++)
 		V[i] = i;
 
-	omp_set_num_threads(t);
-
 	ti = dwalltime();
 
 	uint64_t pares = 0;
-#pragma omp parallel for reduction(+:pares)
 	for (uint64_t i = 0; i < n; i++)
 		if((V[i] & 1) == 0)
 			pares++;

@@ -4,11 +4,16 @@
 #include <sys/time.h>
 #include <string.h>
 #include <stdbool.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <math.h>
 
 /* Defines para acceso a matrices triangulares */
 #define U_FIL(i,j) (i * n + j - (i * (i + 1)) / 2)
 #define U_COL(i,j) (i + (j * (j + 1)) / 2)
 #define L_FIL(i,j) (j + (i * (i + 1)) / 2)
+
+bool use_file;
 
 /* Cantidad de hilos y dimensión de matrices */
 int t, n;
@@ -17,13 +22,19 @@ int t, n;
 double *A, *B, *C, *D, *E, *F, *U, *L;
 double *AT, *BT, *CT, *ET, *FT, *UT;
 
-/* Matrices intermedias. No se reservan memoria exclusiva para estos*/
+/* Puntero a resultado final */
+double *result;
+
+/* Matriz con el resultado dado como entrada */
+double *given_result;
+
+/* Matrices intermedias. No se reservan memoria exclusiva para estos. */
 double *AA, *AAC;
 double *LB, *LBE;
 double *DU, *DUF;
 
 /* Sumas de U, L y B junto a sus mutexes*/
-double up, lp, bp;
+double sum_u, sum_l, sum_b;
 pthread_mutex_t up_mutex, lp_mutex, bp_mutex;
 pthread_barrier_t barrier;
 
@@ -37,26 +48,10 @@ double dwalltime()
 }
 
 /*
- *	Halla la posición (i,j) que el elemento ubicado en la posición opt_pos
- *	tendría si la matriz no estuviera alocada optimizando el uso de la memoria.
- */
-void unoptimized_pos(int * i, int * j, int n, int opt_pos)
-{
-	int row = 0;
-	int count = n;
-	while (count < opt_pos)
-	{
-		row++;
-		count = count + (count - 1);
-	}
-	*i = row;
-	*j = n * row - (count - opt_pos);
-}
-
-/*
  * Traspone src, dejando el resultado en dst. src y dst deben ser distintos.
  */
-void transpose(double * restrict dst, const double * restrict src, int n, int t, int id)
+void transpose(double *restrict dst, const double *restrict src, int n,
+	       int t, int id)
 {
 	int slice = n / t;
 	for (int i = id * slice; i < slice * (id + 1); i++)
@@ -64,7 +59,8 @@ void transpose(double * restrict dst, const double * restrict src, int n, int t,
 			dst[i * n + j] = src[j * n + i];
 }
 
-void multiply(double *C, const double * restrict B, const double * restrict A, int n, int t, int id)
+void multiply(double *C, const double *restrict B,
+	      const double *restrict A, int n, int t, int id)
 {
 	int slice = n / t;
 
@@ -75,30 +71,19 @@ void multiply(double *C, const double * restrict B, const double * restrict A, i
 	for (int i = id * slice; i < slice * (id + 1); i++)
 		for (int j = 0; j < n; j++)
 			for (int k = 0; k < n; k++)
-				C[i * n + j] += A[i * n + k] * B[j * n + k];
+				C[i * n + j] +=
+				    A[i * n + k] * B[j * n + k];
 
 }
 
-#warning No implementado
-void transpose_upper(double * restrict dst, const double * restrict src, int n, int t, int id)
+void transpose_upper(double *restrict dst, const double *restrict src,
+		     int n, int t, int id)
 {
-	/* Cantidad de elemtos que corresponden al hilo: slice = total_elem / t */
-	int slice =	(n * (n + 1) / 2) / t;
-	int count = 0;
-	/* Posición real en la matriz "optimizada en memoria" del primer elemento a transponer por este hilo */
-	int opt_pos = id * slice;
-	int i, j;
-	unoptimized_pos(&i, &j, n, opt_pos);
-	while ((count < slice) && (i < n))
-	{
-		while ((count < slice) && (j < n))
-		{
-			dst[U_COL(i,j)] = src[U_FIL(i,j)];
-			count++;
-		}
-		i++;
-		j = i;
-	}
+	/* Cantidad de elementos que corresponden al hilo */
+	int slice = n / t;
+	for (int i = id * slice; i < slice * (id + 1); i++)
+		for (int j = i; j < n; j++)
+			dst[U_COL(i, j)] = src[U_FIL(i, j)];
 }
 
 /*
@@ -115,9 +100,9 @@ void add(double *C, const double *A, const double *B, int n, int t, int id)
  * Multiplica cada elemento de A por factor. Deja el resultado directamente en
  * A.
  */
-void scale(double *A, double factor, int dim, int t, int id)
+void scale(double *A, double factor, int n, int t, int id)
 {
-	for (int i = id * dim / t; i < (id + 1) * dim / t; i++)
+	for (int i = id * (n * n) / t; i < (id + 1) * n * n / t; i++)
 		A[i] *= factor;
 }
 
@@ -125,12 +110,15 @@ void scale(double *A, double factor, int dim, int t, int id)
  * Suma todos los elementos de A. Añade la suma a la variable res atómicamente,
  * usando el mútex mutex.
  */
-void sum(const double *A, double *res, pthread_mutex_t *mutex, int n, int id)
+void sum(const double *A, double *res, pthread_mutex_t * mutex, int n,
+	 int id)
 {
 	double partial = 0;
+	int slice = n * n / t;
 
-	for (int i = id * (n * n); i < (id + 1) * n * n; i++)
+	for (int i = id * slice / t; i < (id + 1) * slice / t; i++)
 		partial += A[i];
+
 	pthread_mutex_lock(mutex);
 	*res += partial;
 	pthread_mutex_unlock(mutex);
@@ -141,20 +129,25 @@ void sum(const double *A, double *res, pthread_mutex_t *mutex, int n, int id)
  * por filas.
  * El resultado se almacena en C. C != B != A.
  */
-void multiply_ll(double * restrict C, const double * restrict A, const double * restrict B, int n, int t, int id)
+void multiply_ll(double *restrict C, const double *restrict A,
+		 const double *restrict B, int n, int t, int id)
 {
 	int slice = n / t;
 
-	/* Inicializamos en cero */
-	memset(C + id * slice, 0, sizeof(double) * slice * n);
-
 	/* Multiplicación convencional fila * columna */
-	for (int i = id * slice; i < slice * (id + 1); i++)
-		for (int j = 0; j < n; j++)
-			/* Cuando k > i los elementos de A valen 0, por lo tanto se deja de sumar. */
-			for (int k = 0; k <= i; k++)
-				C[i * n + j] += A[L_FIL(i,k)] * B[j * n + k];
-
+	for (int i = id * slice; i < slice * (id + 1); i++) {
+		for (int j = 0; j < n; j++) {
+			/* 
+			 * Cuando k > i los elementos de A valen 0, por lo
+			 * tanto se deja de sumar.
+			 */
+			double c = 0;
+			for (int k = 0; k <= i; k++) {
+				c += A[L_FIL(i, k)] * B[j * n + k];
+			}
+			C[i * n + j] += c;
+		}
+	}
 }
 
 /*
@@ -162,35 +155,45 @@ void multiply_ll(double * restrict C, const double * restrict A, const double * 
  * por columnas.
  * El resultado se almacena en C. C != B != A.
  */
-void multiply_ru(double * restrict C, const double * restrict A, const double * restrict B, int n, int t, int id)
+void multiply_ru(double *restrict C, const double *restrict A,
+		 const double *restrict B, int n, int t, int id)
 {
 	int slice = n / t;
 
-	/* Inicializamos en cero */
-	memset(C + id * slice, 0, sizeof(double) * slice * n);
-
 	/* Multiplicación convencional fila * columna */
-	for (int i = id * slice; i < slice * (id + 1); i++)
-		for (int j = 0; j < n; j++)
-			/* Cuando k > j los elementos de B valen 0, por lo tanto se deja de sumar. */
-			for (int k = 0; k <= j; k++)
-					C[i * n + j] += A[i * n + k] * B[U_COL(k,j)];
-
+	for (int i = id * slice; i < slice * (id + 1); i++) {
+		for (int j = 0; j < n; j++) {
+			double c = 0;
+			/* 
+			 * Cuando k > j los elementos de B valen 0, por lo 
+			 * tanto se deja de sumar.
+			 */
+			for (int k = 0; k <= j; k++) {
+				c += A[i * n + k] * B[U_COL(k, j)];
+			}
+			C[i * n + j] = c;
+		}
+	}
 }
 
 void *worker(void *idp)
 {
-	int id = *(int*) idp;
+	int id = *(int *) idp;
+	float avg_u, avg_l, avg_b;
+	const int size = n * n;
 
 	/* Promedio de u */
-	sum(U, &up, &up_mutex, n, id);
+	sum(U, &sum_u, &up_mutex, n, id);
 	pthread_barrier_wait(&barrier);
+	avg_u = sum_u / size;
 	/* Promedio de l */
-	sum(L, &lp, &lp_mutex, n, id);
+	sum(L, &sum_l, &lp_mutex, n, id);
 	pthread_barrier_wait(&barrier);
+	avg_l = sum_l / size;
 	/* Promedio de b */
-	sum(L, &bp, &lp_mutex, n, id);
+	sum(B, &sum_b, &bp_mutex, n, id);
 	pthread_barrier_wait(&barrier);
+	avg_b = sum_b / size;
 
 	/* Transpuestas */
 	transpose(AT, A, n, t, id);
@@ -201,59 +204,129 @@ void *worker(void *idp)
 	transpose_upper(UT, U, n, t, id);
 	pthread_barrier_wait(&barrier);
 
-	/*  AA */
-	AA = C; /* Reutilizamos el espacio de C */
+	/* AA */
+	AA = C;			/* Reutilizamos el espacio de C */
 	multiply(C, A, AT, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* AAC */
-	AAC = A; /* Reutilizamos A */
+	AAC = A;		/* Reutilizamos A */
 	multiply(AAC, AA, CT, n, t, id);
 
 	/* ulAAC */
-	scale(AAC, (up + lp) / (n * n * n * n), n * n, t, id);
+	scale(AAC, avg_u * avg_l, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* LB */
-	LB = C;  /* Reutilizamos el espacio de C de vuelta */
+	LB = C;			/* Reutilizamos el espacio de C de vuelta */
 	multiply_ll(LB, L, BT, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* LBE */
-	LBE = B; /* Reutilizamos el espacio de B */
+	LBE = B;		/* Reutilizamos el espacio de B */
 	multiply(LBE, LB, ET, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* DU */
-	DU = C; /* Reutilizamos el espacio de C */
+	DU = C;			/* Reutilizamos el espacio de C */
 	multiply_ru(DU, D, UT, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* DUF */
-	DUF = E; /* Reutilizamos el espacio de C */
+	DUF = E;		/* Reutilizamos el espacio de C */
 	multiply(DUF, DU, FT, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* b/(LBE + DUF) en el espacio de C */
 	add(C, LBE, DUF, n, t, id);
-	scale(C, bp / (n * n) , n, t, id);
+	scale(C, avg_b, n, t, id);
 
 	/* Resultado final en A */
 	add(A, AAC, C, n, t, id);
-
+	result = A;
 
 	return NULL;
 }
+
+void load(const char *file)
+{
+	int fd = open(file, O_RDONLY);
+	if (fd < 1) {
+		perror("load");
+		exit(-1);
+	}
+	read(fd, A, n * n * sizeof(double));
+	read(fd, B, n * n * sizeof(double));
+	read(fd, C, n * n * sizeof(double));
+	read(fd, D, n * n * sizeof(double));
+	read(fd, E, n * n * sizeof(double));
+	read(fd, F, n * n * sizeof(double));
+
+	double *ptr = L;
+	for (int i = 1; i <= n; i++) {
+		read(fd, ptr, i * sizeof(double));
+		ptr += i;
+		lseek(fd, (n - i) * sizeof(double), SEEK_CUR);
+	}
+
+	ptr = U;
+	for (int i = n; i >= 1; i--) {
+		lseek(fd, (n - i) * sizeof(double), SEEK_CUR);
+		read(fd, ptr, i * sizeof(double));
+		ptr += i;
+	}
+
+	read(fd, given_result, n * n * sizeof(double));
+
+	close(fd);
+}
+
+/*
+ * Inicializa todas las matrices en 1.
+ */
+void ones()
+{
+	const size_t size = n * n * sizeof(double);
+	const size_t tsize = (n * (n + 1)) / 2 * sizeof(double);
+
+	for (int i = 0; i < n * n; i++)
+		A[i] = 1;
+
+	memcpy(B, A, size);
+	memcpy(C, A, size);
+	memcpy(D, A, size);
+	memcpy(E, A, size);
+	memcpy(F, A, size);
+	memcpy(L, A, tsize);
+	memcpy(U, A, tsize);
+}
+
+/*
+ * Compara las matrices A y B con una tolerancia epsilon. A y B deben estar 
+ * almacenadas de la misma forma.
+ */
+bool compare(double *A, double *B, int n, double epsilon)
+{
+	for (int i = 0; i < n * n; i++) {
+		if (fabs(A - B) > epsilon)
+			return false;
+	}
+
+	return true;
+}
+
 
 int main(int argc, char **argv)
 {
 	/* Tiempos */
 	double ti, tf;
 
-	if (argc != 3) {
-		printf("producto T n\n");
+	if (argc != 3 && argc != 4) {
+		printf("producto T n [archivo]\n");
 		return -1;
 	}
+
+	use_file = argc == 4;
 
 	/* Cantidad de hilos */
 	t = atoi(argv[1]);
@@ -292,6 +365,16 @@ int main(int argc, char **argv)
 	ET = malloc(sizeof(double) * n * n);
 	FT = malloc(sizeof(double) * n * n);
 	UT = malloc(sizeof(double) * (n * (n + 1) / 2));
+	given_result = malloc(sizeof(double) * n * n);
+
+	/*
+	 * Si se pasa un archivo, usar para cargar la matrices. Si no,
+	 * inicializarlas en 1.
+	 */
+	if (use_file)
+		load(argv[3]);
+	else
+		ones();
 
 	/*
 	 * Inicializamos la barrera y arrancamos los hilos.
@@ -306,6 +389,18 @@ int main(int argc, char **argv)
 
 	printf("T = %f [s]\n", tf - ti);
 
+	if (use_file) {
+		if (compare(given_result, result, n, 0.1))
+			fprintf(stderr, "OK\n");
+		else
+			fprintf(stderr, "ERROR\n");
+	}
+
+	/*
+	 * Estos punteros no cambiaron nunca desde el malloc. Siguen apuntando
+	 * a sus respectivas regiones de memorias. Con lo que no hay problema
+	 * en hacer free() sobre cada uno de estos.
+	 */
 	free(A);
 	free(B);
 	free(C);
@@ -320,6 +415,7 @@ int main(int argc, char **argv)
 	free(ET);
 	free(FT);
 	free(UT);
+	free(given_result);
 	pthread_barrier_destroy(&barrier);
 	pthread_mutex_destroy(&up_mutex);
 	pthread_mutex_destroy(&lp_mutex);
@@ -327,3 +423,4 @@ int main(int argc, char **argv)
 
 	return 0;
 }
+
