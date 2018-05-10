@@ -68,7 +68,7 @@ void transpose_upper(double *restrict dst, const double *restrict src,
 	/* Cantidad de elementos que corresponden al hilo */
 	int slice = n / t;
 	for (int j = id * slice; j < slice * (id + 1); j++)
-		for (int i = 0; i < n; i++)
+		for (int i = 0; i <= j; i++)
 			dst[U_COL(i, j)] = src[U_FIL(i, j)];
 }
 

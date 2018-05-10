@@ -13,6 +13,8 @@
 #define U_COL(i,j) (i + (j * (j + 1)) / 2)
 #define L_FIL(i,j) (j + (i * (i + 1)) / 2)
 
+bool use_file;
+
 /* Cantidad de hilos y dimensión de matrices */
 int t, n;
 
@@ -24,16 +26,16 @@ double *AT, *BT, *CT, *ET, *FT, *UT;
 double *AA, *AAC;
 double *LB, *LBE;
 double *DU, *DUF;
+double *LBEpDUF;
 
-/* Sumas de U, L y B */
-double up, lp, bp;
-
-bool use_file;
 /* Puntero a resultado final */
 double *result;
 
 /* Matriz con el resultado dado como entrada */
 double *given_result;
+
+/* Sumas de U, L y B */
+double sum_u = 0, sum_l = 0, sum_b = 0;
 
 double dwalltime()
 {
@@ -47,34 +49,22 @@ double dwalltime()
 /*
  * Traspone src, dejando el resultado en dst. src y dst deben ser distintos.
  */
-void transpose(double * restrict dst, const double * restrict src, int n)
+void transpose(double *restrict dst, const double *restrict src, int n)
 {
-  #pragma omp parallel for
-	for (int i = 0; i < n; i++)
-		for (int j = 0; j < n; j++)
-			dst[i * n + j] = src[j * n + i];
+#pragma omp parallel for
+	for (int j = 0; j < n; j++)
+		for (int i = 0; i < n; i++)
+			dst[j * n + i] = src[i * n + j];
 }
 
-void multiply(double *C, const double * restrict B, const double * restrict A, int n)
-{
-	/* Multiplicación convencional fila * columna */
-  #pragma omp parallel for
-  for (int i = 0; i < n; i++)
-		for (int j = 0; j < n; j++)
-		{
-      double partial = 0;
-			for (int k = 0; k < n; k++)
-				partial += A[i * n + k] * B[j * n + k];
-			C[i * n + j] = partial;
-		}
-}
 
-void transpose_upper(double * restrict dst, const double * restrict src, int n)
+void transpose_upper(double *restrict dst, const double *restrict src,
+		     int n)
 {
-	#pragma omp parallel for
-	for (int i = 0; i < n; i++)
-		for (int j = i; j < n; j++)
-			dst[U_COL(i,j)] = src[U_FIL(i,j)];
+#pragma omp parallel for
+	for (int j = 0; j < n; j++)
+		for (int i = 0; i <= j; i++)
+			dst[U_COL(i, j)] = src[U_FIL(i, j)];
 
 }
 
@@ -84,7 +74,7 @@ void transpose_upper(double * restrict dst, const double * restrict src, int n)
  */
 void add(double *C, const double *A, const double *B, int n)
 {
-  #pragma omp parallel for
+#pragma omp parallel for
 	for (int i = 0; i < n * n; i++)
 		C[i] = A[i] + B[i];
 }
@@ -95,7 +85,7 @@ void add(double *C, const double *A, const double *B, int n)
  */
 void scale(double *A, double factor, int dim)
 {
-  #pragma omp parallel for
+#pragma omp parallel for
 	for (int i = 0; i < dim; i++)
 		A[i] *= factor;
 }
@@ -103,13 +93,28 @@ void scale(double *A, double factor, int dim)
 /*
  * Suma todos los elementos de A.
  */
-void sum(const double *A, double *res, int n)
+void sum(const double *A, double *res, int dim)
 {
 	double partial = 0;
-  #pragma omp parallel for reduction(+:partial)
-	for (int i = 0; i < n * n; i++)
+#pragma omp parallel for reduction(+:partial)
+	for (int i = 0; i < dim; i++)
 		partial += A[i];
+
 	*res = partial;
+}
+
+void multiply(double *C, const double *restrict A,
+	      const double *restrict B, int n)
+{
+	/* Multiplicación convencional fila * columna */
+#pragma omp parallel for
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j < n; j++) {
+			double partial = 0;
+			for (int k = 0; k < n; k++)
+				partial += A[i * n + k] * B[j * n + k];
+			C[i * n + j] = partial;
+		}
 }
 
 /*
@@ -117,19 +122,20 @@ void sum(const double *A, double *res, int n)
  * por filas.
  * El resultado se almacena en C. C != B != A.
  */
-void multiply_ll(double * restrict C, const double * restrict A, const double * restrict B, int n)
+void multiply_ll(double *restrict C, const double *restrict A,
+		 const double *restrict B, int n)
 {
-  /* Multiplicación convencional fila * columna */
-  #pragma omp parallel for
-  for (int i = 0; i < n; i++)
-		for (int j = 0; j < n; j++)
-    {
+	/* Multiplicación convencional fila * columna */
+#pragma omp parallel for
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
 			double partial = 0;
 			/* Cuando k > i los elementos de A valen 0, por lo tanto se deja de sumar. */
 			for (int k = 0; k <= i; k++)
-			 partial += A[L_FIL(i,k)] * B[j * n + k];
+				partial += A[L_FIL(i, k)] * B[j * n + k];
 			C[i * n + j] = partial;
-    }
+		}
+	}
 }
 
 /*
@@ -137,19 +143,19 @@ void multiply_ll(double * restrict C, const double * restrict A, const double * 
  * por columnas.
  * El resultado se almacena en C. C != B != A.
  */
-void multiply_ru(double * restrict C, const double * restrict A, const double * restrict B, int n)
+void multiply_ru(double *restrict C, const double *restrict A,
+		 const double *restrict B, int n)
 {
 	/* Multiplicación convencional fila * columna */
-  #pragma omp parallel for
-  for (int i = 0; i < n; i++)
-		for (int j = 0; j < n; j++)
-    {
-      double partial = 0;
+#pragma omp parallel for
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j < n; j++) {
+			double partial = 0;
 			/* Cuando k > j los elementos de B valen 0, por lo tanto se deja de sumar. */
 			for (int k = 0; k <= j; k++)
-				 partial += A[i * n + k] * B[U_COL(k,j)];
+				partial += A[i * n + k] * B[U_COL(k, j)];
 			C[i * n + j] = partial;
-    }
+		}
 }
 
 
@@ -268,19 +274,23 @@ int main(int argc, char **argv)
 	ti = dwalltime();
 
 	/*
-	* Inicializamos los hilos.
-	*/
+	 * Seteamos la cantidad de hilos.
+	 */
 	omp_set_num_threads(t);
 
-  /* Promedio de u */
-	sum(U, &up, n);
-	#pragma omp barrier
+	/* Promedio de u */
+	sum(U, &sum_u, (n * (n + 1)) / 2);
+#pragma omp barrier
 	/* Promedio de l */
-	sum(L, &lp, n);
-	#pragma omp barrier
+	sum(L, &sum_l, (n * (n + 1)) / 2);
+#pragma omp barrier
 	/* Promedio de b */
-	sum(B, &bp, n);
-	#pragma omp barrier
+	sum(B, &sum_b, n * n);
+#pragma omp barrier
+
+	double avg_u = sum_u / (n * n);
+	double avg_l = sum_l / (n * n);
+	double avg_b = sum_b / (n * n);
 
 	/* Transpuestas */
 	transpose(AT, A, n);
@@ -289,48 +299,50 @@ int main(int argc, char **argv)
 	transpose(ET, E, n);
 	transpose(FT, F, n);
 	transpose_upper(UT, U, n);
-	#pragma omp barrier
+#pragma omp barrier
 
 	/*  AA */
-	AA = C; /* Reutilizamos el espacio de C */
+	AA = C;			/* Reutilizamos el espacio de C */
 	multiply(C, A, AT, n);
-	#pragma omp barrier
+#pragma omp barrier
 
 	/* AAC */
-	AAC = A; /* Reutilizamos A */
+	AAC = A;		/* Reutilizamos A */
 	multiply(AAC, AA, CT, n);
 
 	/* ulAAC */
-	scale(AAC, (up + lp) / (n * n), n * n);
-	#pragma omp barrier
+	scale(AAC, avg_u * avg_l, n * n);
+#pragma omp barrier
 
 	/* LB */
-	LB = C;  /* Reutilizamos el espacio de C de vuelta */
+	LB = C;			/* Reutilizamos el espacio de C de vuelta */
 	multiply_ll(LB, L, BT, n);
-	#pragma omp barrier
+#pragma omp barrier
 
 	/* LBE */
-	LBE = B; /* Reutilizamos el espacio de B */
+	LBE = B;		/* Reutilizamos el espacio de B */
 	multiply(LBE, LB, ET, n);
-	#pragma omp barrier
+#pragma omp barrier
 
 	/* DU */
-	DU = C; /* Reutilizamos el espacio de C */
+	DU = C;			/* Reutilizamos el espacio de C */
 	multiply_ru(DU, D, UT, n);
-	#pragma omp barrier
+#pragma omp barrier
 
 	/* DUF */
-	DUF = E; /* Reutilizamos el espacio de E*/
+	DUF = E;		/* Reutilizamos el espacio de E */
 	multiply(DUF, DU, FT, n);
-	#pragma omp barrier
+#pragma omp barrier
 
 	/* b/(LBE + DUF) en el espacio de C */
-	add(C, LBE, DUF, n);
-	scale(C, bp / (n * n) , n);
+	LBEpDUF = LBE;
+	add(LBEpDUF, LBE, DUF, n);
+	scale(C, avg_b, n);
 
+	result = A;
 	/* Resultado final en A */
-	add(A, AAC, C, n);
-	#pragma omp barrier
+	add(result, AAC, C, n);
+#pragma omp barrier
 
 	tf = dwalltime();
 
