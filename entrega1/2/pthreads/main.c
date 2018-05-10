@@ -32,6 +32,7 @@ double *given_result;
 double *AA, *AAC;
 double *LB, *LBE;
 double *DU, *DUF;
+double *LBEpDUF;
 
 /* Sumas de U, L y B junto a sus mutexes*/
 double sum_u, sum_l, sum_b;
@@ -61,30 +62,13 @@ void transpose(double *restrict dst, const double *restrict src, int n,
 
 }
 
-void multiply(double *C, const double *restrict B,
-	      const double *restrict A, int n, int t, int id)
-{
-	int slice = n / t;
-
-	/* Inicializamos en cero */
-	memset(C + id * slice, 0, sizeof(double) * slice * n);
-
-	/* Multiplicación convencional fila * columna */
-	for (int i = id * slice; i < slice * (id + 1); i++)
-		for (int j = 0; j < n; j++)
-			for (int k = 0; k < n; k++)
-				C[i * n + j] +=
-				    A[i * n + k] * B[j * n + k];
-
-}
-
 void transpose_upper(double *restrict dst, const double *restrict src,
 		     int n, int t, int id)
 {
 	/* Cantidad de elementos que corresponden al hilo */
 	int slice = n / t;
-	for (int i = id * slice; i < slice * (id + 1); i++)
-		for (int j = i; j < n; j++)
+	for (int j = id * slice; j < slice * (id + 1); j++)
+		for (int i = 0; i < n; i++)
 			dst[U_COL(i, j)] = src[U_FIL(i, j)];
 }
 
@@ -94,7 +78,8 @@ void transpose_upper(double *restrict dst, const double *restrict src,
  */
 void add(double *C, const double *A, const double *B, int n, int t, int id)
 {
-	for (int i = id * (n * n) / t; i < (id + 1) * n * n / t; i++)
+	int slice = (n * n) / t;
+	for (int i = id * slice; i < (id + 1) * slice; i++)
 		C[i] = A[i] + B[i];
 }
 
@@ -104,7 +89,8 @@ void add(double *C, const double *A, const double *B, int n, int t, int id)
  */
 void scale(double *A, double factor, int n, int t, int id)
 {
-	for (int i = id * (n * n) / t; i < (id + 1) * n * n / t; i++)
+	int slice = (n * n) / t;
+	for (int i = id * slice; i < (id + 1) * slice; i++)
 		A[i] *= factor;
 }
 
@@ -116,7 +102,7 @@ void sum(const double *A, double *res, pthread_mutex_t * mutex, int n,
 	 int id)
 {
 	double partial = 0;
-	int slice = n * n / t;
+	int slice = (n * n) / t;
 
 	for (int i = id * slice / t; i < (id + 1) * slice / t; i++)
 		partial += A[i];
@@ -124,6 +110,25 @@ void sum(const double *A, double *res, pthread_mutex_t * mutex, int n,
 	pthread_mutex_lock(mutex);
 	*res += partial;
 	pthread_mutex_unlock(mutex);
+}
+
+void multiply(double *C, const double *restrict B,
+	      const double *restrict A, int n, int t, int id)
+{
+	int slice = n / t;
+	double c;
+
+	/* Multiplicación convencional fila * columna */
+	for (int i = id * slice; i < slice * (id + 1); i++) {
+		for (int j = 0; j < n; j++) {
+			c = 0;
+			for (int k = 0; k < n; k++) {
+				    c += A[i * n + k] * B[j * n + k];
+			}
+			C[i * n + j] = c;
+		}
+	}
+
 }
 
 /*
@@ -135,18 +140,18 @@ void multiply_ll(double *restrict C, const double *restrict A,
 		 const double *restrict B, int n, int t, int id)
 {
 	int slice = n / t;
+	double c;
 
-	/* Multiplicación convencional fila * columna */
 	for (int i = id * slice; i < slice * (id + 1); i++) {
 		for (int j = 0; j < n; j++) {
 			/* 
 			 * Cuando k > i los elementos de A valen 0, por lo
 			 * tanto se deja de sumar.
 			 */
-			double c = 0;
-			for (int k = 0; k <= i; k++) {
+			c = 0;
+			for (int k = 0; k <= i; k++)
 				c += A[L_FIL(i, k)] * B[j * n + k];
-			}
+
 			C[i * n + j] += c;
 		}
 	}
@@ -161,18 +166,18 @@ void multiply_ru(double *restrict C, const double *restrict A,
 		 const double *restrict B, int n, int t, int id)
 {
 	int slice = n / t;
+	double c;
 
-	/* Multiplicación convencional fila * columna */
 	for (int i = id * slice; i < slice * (id + 1); i++) {
 		for (int j = 0; j < n; j++) {
-			double c = 0;
+			c = 0;
 			/* 
 			 * Cuando k > j los elementos de B valen 0, por lo 
 			 * tanto se deja de sumar.
 			 */
-			for (int k = 0; k <= j; k++) {
+			for (int k = 0; k <= j; k++)
 				c += A[i * n + k] * B[U_COL(k, j)];
-			}
+
 			C[i * n + j] = c;
 		}
 	}
@@ -208,7 +213,7 @@ void *worker(void *idp)
 
 	/* AA */
 	AA = C;			/* Reutilizamos el espacio de C */
-	multiply(C, A, AT, n, t, id);
+	multiply(AA, A, AT, n, t, id);
 	pthread_barrier_wait(&barrier);
 
 	/* AAC */
@@ -239,13 +244,14 @@ void *worker(void *idp)
 	multiply(DUF, DU, FT, n, t, id);
 	pthread_barrier_wait(&barrier);
 
-	/* b/(LBE + DUF) en el espacio de C */
-	add(C, LBE, DUF, n, t, id);
-	scale(C, avg_b, n, t, id);
+	/* b/(LBE + DUF) */
+	LBEpDUF = LBE;
+	add(LBEpDUF, LBE, DUF, n, t, id);
+	scale(LBEpDUF, avg_b, n, t, id);
 
 	/* Resultado final en A */
-	add(A, AAC, C, n, t, id);
 	result = A;
+	add(result, AAC, LBEpDUF, n, t, id);
 
 	return NULL;
 }
