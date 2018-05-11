@@ -219,7 +219,7 @@ void ones()
 bool compare(double *A, double *B, int n, double epsilon)
 {
 	for (int i = 0; i < n * n; i++) {
-		if (fabs(A[i] - B[i]) > epsilon)
+		if (fabs(A[i] - B[i]) > (A[i] * epsilon))
 			return false;
 	}
 
@@ -303,7 +303,7 @@ int main(int argc, char **argv)
 
 	/*  AA */
 	AA = C;			/* Reutilizamos el espacio de C */
-	multiply(C, A, AT, n);
+	multiply(AA, A, AT, n);
 #pragma omp barrier
 
 	/* AAC */
@@ -335,13 +335,13 @@ int main(int argc, char **argv)
 #pragma omp barrier
 
 	/* b/(LBE + DUF) en el espacio de C */
-	LBEpDUF = LBE;
+	LBEpDUF = C;
 	add(LBEpDUF, LBE, DUF, n);
-	scale(C, avg_b, n);
+	scale(LBEpDUF, avg_b, n);
 
 	result = A;
 	/* Resultado final en A */
-	add(result, AAC, C, n);
+	add(result, AAC, LBEpDUF, n);
 #pragma omp barrier
 
 	tf = dwalltime();
@@ -349,7 +349,7 @@ int main(int argc, char **argv)
 	printf("T = %f [s]\n", tf - ti);
 
 	if (use_file) {
-		if (compare(given_result, result, n, 0.1))
+		if (compare(given_result, result, n, 0.01))
 			fprintf(stderr, "OK\n");
 		else
 			fprintf(stderr, "ERROR\n");

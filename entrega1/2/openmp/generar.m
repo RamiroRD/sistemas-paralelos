@@ -1,5 +1,5 @@
 pkg load image
-N = 4;
+N = 1024;
 file = fopen('data.bin','w');
 A = 1 * rand(N, N);
 B = 2 * rand(N, N);
