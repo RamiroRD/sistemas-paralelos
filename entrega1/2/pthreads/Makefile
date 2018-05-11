@@ -1,8 +1,11 @@
-CFLAGS=-pthread -std=gnu99 -Wall -O0 -g
+CFLAGS= -pthread -std=gnu99 -Wall -O0
+LDFLAGS= -pthread -lm
 
-main: 
+main: main.o
+
+main.o: 
 
 
 clean:
-	rm -rf main
+	rm -rf main *.o
 

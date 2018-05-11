@@ -67,6 +67,7 @@ void transpose_upper(double *restrict dst, const double *restrict src,
 {
 	/* Cantidad de elementos que corresponden al hilo */
 	int slice = n / t;
+
 	for (int j = id * slice; j < slice * (id + 1); j++)
 		for (int i = 0; i <= j; i++)
 			dst[U_COL(i, j)] = src[U_FIL(i, j)];
@@ -79,6 +80,7 @@ void transpose_upper(double *restrict dst, const double *restrict src,
 void add(double *C, const double *A, const double *B, int n, int t, int id)
 {
 	int slice = (n * n) / t;
+
 	for (int i = id * slice; i < (id + 1) * slice; i++)
 		C[i] = A[i] + B[i];
 }
@@ -104,7 +106,7 @@ void sum(const double *A, double *res, pthread_mutex_t * mutex, int n,
 	double partial = 0;
 	int slice = (n * n) / t;
 
-	for (int i = id * slice / t; i < (id + 1) * slice / t; i++)
+	for (int i = id * slice; i < (id + 1) * slice; i++)
 		partial += A[i];
 
 	pthread_mutex_lock(mutex);
@@ -232,15 +234,14 @@ void *worker(void *idp)
 
 	/* Promedio de u */
 	sum_upper(U, &sum_u, &up_mutex, n, id);
-	pthread_barrier_wait(&barrier);
-	avg_u = sum_u / size;
 	/* Promedio de l */
 	sum_lower(L, &sum_l, &lp_mutex, n, id);
-	pthread_barrier_wait(&barrier);
-	avg_l = sum_l / size;
 	/* Promedio de b */
 	sum(B, &sum_b, &bp_mutex, n, id);
+
 	pthread_barrier_wait(&barrier);
+	avg_u = sum_u / size;
+	avg_l = sum_l / size;
 	avg_b = sum_b / size;
 
 	/* Transpuestas */
@@ -289,7 +290,9 @@ void *worker(void *idp)
 	/* b/(LBE + DUF) */
 	LBEpDUF = LBE;
 	add(LBEpDUF, LBE, DUF, n, t, id);
+	pthread_barrier_wait(&barrier); /* Innecesaria? */
 	scale(LBEpDUF, avg_b, n, t, id);
+	pthread_barrier_wait(&barrier); /* Innecesaria? */
 
 	/* Resultado final en A */
 	result = A;
@@ -355,14 +358,16 @@ void ones()
  * Compara las matrices A y B con una tolerancia epsilon. A y B deben estar 
  * almacenadas de la misma forma.
  */
-bool compare(double *A, double *B, int n, double epsilon)
+double rms(double *A, double *B, int n)
 {
+	double res = 0;
 	for (int i = 0; i < n * n; i++) {
-		if (fabs(A[i] - B[i]) > epsilon)
-			return false;
+		double d = (A[i] - B[i]);
+		d *= d;
+		res += d;
 	}
 
-	return true;
+	return res / (n * n);
 }
 
 
@@ -439,12 +444,8 @@ int main(int argc, char **argv)
 
 	printf("T = %f [s]\n", tf - ti);
 
-	if (use_file) {
-		if (compare(given_result, result, n, 0.1))
-			fprintf(stderr, "OK\n");
-		else
-			fprintf(stderr, "ERROR\n");
-	}
+	if (use_file)
+		fprintf(stderr, "RMS*RMS = %f\n", rms(given_result, result, n));
 
 	/*
 	 * Estos punteros no cambiaron nunca desde el malloc. Siguen apuntando
