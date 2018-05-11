@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <sys/time.h>
 #include <string.h>
 #include <stdbool.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 int t, n;
 double *A, *B, *C;
@@ -43,7 +46,9 @@ int main(int argc, char **argv)
 	for (int i = 0; i < n * n; i++)
 		A[i] = 1.0;
 
+#ifdef _OPENMP
 	omp_set_num_threads(t);
+#endif
 
 	ti = dwalltime();
 

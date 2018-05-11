@@ -1,10 +1,13 @@
-CFLAGS=-pthread -fopenmp -std=gnu99 -Wall -O0
+CFLAGS= -std=gnu99 -Wall -O0
 
-producto: 
+all: producto producto-secuencial
 
-producto-secuencial:
+producto: producto.c
+	$(CC) $(CFLAGS) -fopenmp -o producto producto.c
 
+producto-secuencial: producto.c
+	$(CC) $(CFLAGS) -o producto-secuencial producto.c
 
 clean:
-	rm -rf producto
+	rm -rf producto producto-secuencial
 
