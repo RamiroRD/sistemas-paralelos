@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <sys/time.h>
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <stdint.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 int t;
 uint64_t n;
@@ -51,7 +54,9 @@ int main(int argc, char **argv)
 	for (uint64_t i = 0; i < n; i++)
 		V[i] = i;
 
+#ifdef _OPENMP
 	omp_set_num_threads(t);
+#endif
 
 	ti = dwalltime();
 
