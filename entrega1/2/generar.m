@@ -1,6 +1,8 @@
 pkg load image
-N = 1024;
-file = fopen('data.bin','w');
+
+arg_list = argv();
+N = str2num(arg_list{1});
+file = fopen(sprintf('data-%d.bin', N),'w');
 A = 1 * rand(N, N);
 B = 2 * rand(N, N);
 C = 3 * rand(N, N);
