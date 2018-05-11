@@ -1,12 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <sys/time.h>
 #include <string.h>
 #include <stdbool.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <math.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 /* Defines para acceso a matrices triangulares */
 #define U_FIL(i,j) (i * n + j - (i * (i + 1)) / 2)
@@ -61,7 +64,7 @@ void transpose(double *restrict dst, const double *restrict src, int n)
 void transpose_upper(double *restrict dst, const double *restrict src,
 		     int n)
 {
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,4)
 	for (int j = 0; j < n; j++)
 		for (int i = 0; i <= j; i++)
 			dst[U_COL(i, j)] = src[U_FIL(i, j)];
@@ -126,7 +129,7 @@ void multiply_ll(double *restrict C, const double *restrict A,
 		 const double *restrict B, int n)
 {
 	/* Multiplicación convencional fila * columna */
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,4)
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < n; j++) {
 			double partial = 0;
@@ -147,7 +150,7 @@ void multiply_ru(double *restrict C, const double *restrict A,
 		 const double *restrict B, int n)
 {
 	/* Multiplicación convencional fila * columna */
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,4)
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++) {
 			double partial = 0;
@@ -276,7 +279,9 @@ int main(int argc, char **argv)
 	/*
 	 * Seteamos la cantidad de hilos.
 	 */
+#ifdef _OPENMP
 	omp_set_num_threads(t);
+#endif
 
 	/* Promedio de u */
 	sum(U, &sum_u, (n * (n + 1)) / 2);
