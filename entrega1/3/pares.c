@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 	}
 
 
-	printf("Alocando %f MiB...\n", sizeof(int) * n / 1048576.0);
+	fprintf(stderr, "Alocando %f MiB...\n", sizeof(int) * n / 1048576.0);
 	V = malloc(sizeof(int) * n);
 	if (!V) {
 		perror("malloc");
@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 	tf = dwalltime();
 
 	printf("T = %f [s]\n", tf - ti);
-	printf("Cantidad de pares: %lu\n", pares);
+	fprintf(stderr, "Cantidad de pares: %lu\n", pares);
 
 	free(V);
 
