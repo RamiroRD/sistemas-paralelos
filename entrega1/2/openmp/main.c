@@ -274,7 +274,6 @@ int main(int argc, char **argv)
 	else
 		ones();
 
-	ti = dwalltime();
 
 	/*
 	 * Seteamos la cantidad de hilos.
@@ -283,15 +282,13 @@ int main(int argc, char **argv)
 	omp_set_num_threads(t);
 #endif
 
+	ti = dwalltime();
 	/* Promedio de u */
 	sum(U, &sum_u, (n * (n + 1)) / 2);
-#pragma omp barrier
 	/* Promedio de l */
 	sum(L, &sum_l, (n * (n + 1)) / 2);
-#pragma omp barrier
 	/* Promedio de b */
 	sum(B, &sum_b, n * n);
-#pragma omp barrier
 
 	double avg_u = sum_u / (n * n);
 	double avg_l = sum_l / (n * n);
@@ -304,12 +301,10 @@ int main(int argc, char **argv)
 	transpose(ET, E, n);
 	transpose(FT, F, n);
 	transpose_upper(UT, U, n);
-#pragma omp barrier
 
 	/*  AA */
 	AA = C;			/* Reutilizamos el espacio de C */
 	multiply(AA, A, AT, n);
-#pragma omp barrier
 
 	/* AAC */
 	AAC = A;		/* Reutilizamos A */
@@ -317,27 +312,22 @@ int main(int argc, char **argv)
 
 	/* ulAAC */
 	scale(AAC, avg_u * avg_l, n * n);
-#pragma omp barrier
 
 	/* LB */
 	LB = C;			/* Reutilizamos el espacio de C de vuelta */
 	multiply_ll(LB, L, BT, n);
-#pragma omp barrier
 
 	/* LBE */
 	LBE = B;		/* Reutilizamos el espacio de B */
 	multiply(LBE, LB, ET, n);
-#pragma omp barrier
 
 	/* DU */
 	DU = C;			/* Reutilizamos el espacio de C */
 	multiply_ru(DU, D, UT, n);
-#pragma omp barrier
 
 	/* DUF */
 	DUF = E;		/* Reutilizamos el espacio de E */
 	multiply(DUF, DU, FT, n);
-#pragma omp barrier
 
 	/* b/(LBE + DUF) en el espacio de C */
 	LBEpDUF = C;
@@ -347,7 +337,6 @@ int main(int argc, char **argv)
 	result = A;
 	/* Resultado final en A */
 	add(result, AAC, LBEpDUF, n);
-#pragma omp barrier
 
 	tf = dwalltime();
 
