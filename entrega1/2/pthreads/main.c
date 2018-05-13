@@ -385,7 +385,7 @@ int main(int argc, char **argv)
 
 	/* Cantidad de hilos */
 	t = atoi(argv[1]);
-	/* Dimensión de bloque (en elementos) */
+	/* Dimensión de las matrices */
 	n = atoi(argv[2]);
 
 

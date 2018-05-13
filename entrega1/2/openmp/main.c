@@ -242,7 +242,7 @@ int main(int argc, char **argv)
 	use_file = argc == 4;
 	/* Cantidad de hilos */
 	t = atoi(argv[1]);
-	/* Dimensión de bloque (en elementos) */
+	/* Dimensión de las matrices */
 	n = atoi(argv[2]);
 
 	/*
