@@ -2,11 +2,24 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+
 #include <unistd.h>
+#include <sys/time.h>
+
 #include <mpi.h>
 
 #define TAG 1
 #define INLINE __attribute__((always_inline))
+
+double dwalltime()
+{
+	double sec;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	sec = tv.tv_sec + tv.tv_usec / 1000000.0;
+
+	return sec;
+}
 
 void one(double *A, int n)
 {
@@ -51,6 +64,7 @@ INLINE
 inline void master(int n, int t)
 {
 	double *A, *B, *C;
+	double ti, tf;
 	const int slice = n * n / t;
 	const size_t size = n * n;
 	MPI_Request requests[2 * (t - 1)];
@@ -61,6 +75,8 @@ inline void master(int n, int t)
 
 	one(A, n);
 	one(B, n);
+
+	ti = dwalltime();
 
 	MPI_Request *req = requests;
 	for (int dest = 1; dest < t; dest++) {
@@ -78,10 +94,13 @@ inline void master(int n, int t)
 	}
 
 	MPI_Waitall(t - 1, requests, MPI_STATUSES_IGNORE);
+	tf = dwalltime();
 
 	// wait_for_gdb();
 
 	fprintf(stderr, check(C, n) ? "OK\n" : "ERROR\n");
+
+	printf("T = %f\n", tf - ti);
 }
 
 INLINE
