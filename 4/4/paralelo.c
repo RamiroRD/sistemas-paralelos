@@ -65,8 +65,20 @@ void wait_for_gdb()
 		sleep(1);
 }
 
+int height(int rank, int t)
+{
+	int h = 1;
+	t--;
+	while (t && (rank & 1) == 0) {
+		h++;
+		rank >>= 1;
+		t >>= 1;
+	}
+	return h;
+}
+
 INLINE
-    inline void common(int n, int t, int rank, double *V,
+inline void common(int n, int t, int rank, double *V,
 		       double *merge_buffer)
 {
 	int step = 1;
@@ -104,6 +116,8 @@ INLINE inline void master(int n, int t)
 
 	init(V, n);
 
+	MPI_Barrier(MPI_COMM_WORLD);
+
 	dur = dwalltime();
 	MPI_Scatter(V, n / t, MPI_DOUBLE, V, n / t, MPI_DOUBLE, 0,
 		    MPI_COMM_WORLD);
@@ -114,14 +128,15 @@ INLINE inline void master(int n, int t)
 	printf("T = %f [s]\n", dwalltime() - dur);
 }
 
-/* TODO: Optimizar memoria */
 INLINE inline void slave(int rank, int n, int t)
 {
 	double *V;
 	double *merge_buffer;
 
-	V = malloc(sizeof(*V) * n);
-	merge_buffer = malloc(sizeof(*V) * n);
+	V = malloc(sizeof(*V) * n / t * (1 << height(rank, t)));
+	merge_buffer = malloc(sizeof(*V) * n / t * (1 << height(rank, t)));
+
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	MPI_Scatter(NULL, 0, MPI_DOUBLE, V, n / t, MPI_DOUBLE, 0,
 		    MPI_COMM_WORLD);
