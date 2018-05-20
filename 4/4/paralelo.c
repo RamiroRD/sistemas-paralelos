@@ -21,8 +21,8 @@ double dwalltime()
 	return sec;
 }
 
-void merge(double *V, double *buffer, uint64_t al, const uint64_t ar, uint64_t bl,
-	 const uint64_t br)
+void merge(double *V, double *buffer, uint64_t al, const uint64_t ar,
+	   uint64_t bl, const uint64_t br)
 {
 	const uint64_t base = al;
 	uint64_t res = 0;
@@ -66,31 +66,34 @@ void wait_for_gdb()
 }
 
 INLINE
-inline void common(int n, int t, int rank, double *V, double *merge_buffer)
+    inline void common(int n, int t, int rank, double *V,
+		       double *merge_buffer)
 {
 	int step = 1;
-	while(rank % step == 0 && step <= t) {
+	while (rank % step == 0 && step <= t) {
 		if (step == 1) {
 			do_sort(V, merge_buffer, 0, n / t - 1);
 		} else {
 			/* Recibimos poniendo todo al final de V */
 			uint64_t local_slice = n / t * (step >> 1);
 			/* Usamos el tag para diferenciar los sends */
-			MPI_Recv(V + local_slice, local_slice, MPI_DOUBLE, MPI_ANY_SOURCE, step >> 1, MPI_COMM_WORLD,
-					MPI_STATUS_IGNORE);
-			
-			merge(V, merge_buffer, 0, local_slice - 1, local_slice, 2 * local_slice - 1);
+			MPI_Recv(V + local_slice, local_slice, MPI_DOUBLE,
+				 MPI_ANY_SOURCE, step >> 1, MPI_COMM_WORLD,
+				 MPI_STATUS_IGNORE);
+
+			merge(V, merge_buffer, 0, local_slice - 1,
+			      local_slice, 2 * local_slice - 1);
 		}
 
 		if ((rank % step == 0) && ((rank / step) % 2 != 0))
-			MPI_Send(V, n / t * step, MPI_DOUBLE, rank - step, step, MPI_COMM_WORLD);
+			MPI_Send(V, n / t * step, MPI_DOUBLE, rank - step,
+				 step, MPI_COMM_WORLD);
 		step <<= 1;
 	}
 }
 
 
-INLINE
-inline void master(int n, int t)
+INLINE inline void master(int n, int t)
 {
 	double *V;
 	double *merge_buffer;
@@ -102,8 +105,9 @@ inline void master(int n, int t)
 	init(V, n);
 
 	dur = dwalltime();
-	MPI_Scatter(V, n / t, MPI_DOUBLE, V, n / t, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	
+	MPI_Scatter(V, n / t, MPI_DOUBLE, V, n / t, MPI_DOUBLE, 0,
+		    MPI_COMM_WORLD);
+
 	common(n, t, 0, V, merge_buffer);
 
 	fprintf(stderr, check(V, n) ? "OK\n" : "ERROR\n");
@@ -111,9 +115,7 @@ inline void master(int n, int t)
 }
 
 /* TODO: Optimizar memoria */
-/* TODO: Microoptimizar */
-INLINE
-inline void slave(int rank, int n, int t) 
+INLINE inline void slave(int rank, int n, int t)
 {
 	double *V;
 	double *merge_buffer;
@@ -121,14 +123,15 @@ inline void slave(int rank, int n, int t)
 	V = malloc(sizeof(*V) * n);
 	merge_buffer = malloc(sizeof(*V) * n);
 
-	MPI_Scatter(NULL, 0, MPI_DOUBLE, V, n / t , MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Scatter(NULL, 0, MPI_DOUBLE, V, n / t, MPI_DOUBLE, 0,
+		    MPI_COMM_WORLD);
 
 	common(n, t, rank, V, merge_buffer);
 
 	free(V);
 	free(merge_buffer);
 }
-  
+
 int main(int argc, char **argv)
 {
 	int rank, t, n;
@@ -152,8 +155,7 @@ int main(int argc, char **argv)
 	else
 		slave(rank, n, t);
 
-skip:
+      skip:
 	MPI_Finalize();
 	return 0;
 }
-
