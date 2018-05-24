@@ -32,16 +32,16 @@ bool check(double *A, int n)
 	bool ok = true;
 	for (int i = 0; i < n * n; i++)
 		ok = ok && (A[i] == n);
-		
+
 	return ok;
 }
 
 INLINE
-inline void multiply(const double *A, const double *B, double *C, int n, int t, int rank)
+inline void multiply(const double *A, const double *B, double *C, int n, int t)
 {
-	const int slice = n / t;
+	const int rowslice = n / t;
 	double c;
-	for (int i = slice * rank; i < slice * (rank + 1); i++) {
+	for (int i = 0; i < rowslice; i++) {
 		for (int j = 0; j < n; j++) {
 			c = 0;
 			for (int k = 0; k < n; k++) {
@@ -80,11 +80,11 @@ inline void master(int n, int t)
 
 	MPI_Request *req = requests;
 	for (int dest = 1; dest < t; dest++) {
-		MPI_Isend(A, n * n, MPI_DOUBLE, dest, TAG, MPI_COMM_WORLD, req++);
+		MPI_Isend(A + dest * slice, slice, MPI_DOUBLE, dest, TAG, MPI_COMM_WORLD, req++);
 		MPI_Isend(B, n * n, MPI_DOUBLE, dest, TAG, MPI_COMM_WORLD, req++);
 	}
 
-	multiply(A, B, C, n, t, 0);
+	multiply(A, B, C, n, t);
 
 	MPI_Waitall(2 * (t - 1), requests, MPI_STATUSES_IGNORE);
 
@@ -104,22 +104,22 @@ inline void master(int n, int t)
 }
 
 INLINE
-inline void slave(int rank, int n, int t) 
+inline void slave(int rank, int n, int t)
 {
 	double *A, *B, *C;
 	const int slice = n * n / t;
 	const size_t size = n * n * sizeof(double);
 
-	A = malloc(size);
+	A = malloc(slice * sizeof(double));
 	B = malloc(size);
-	C = malloc(size);
+	C = malloc(slice * sizeof(double));
 
-	MPI_Recv(A, n * n, MPI_DOUBLE, 0, TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	MPI_Recv(A, slice, MPI_DOUBLE, 0, TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	MPI_Recv(B, n * n, MPI_DOUBLE, 0, TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-	multiply(A, B, C, n, t, rank);
+	multiply(A, B, C, n, t);
 
-	MPI_Send(C + rank * slice, slice, MPI_DOUBLE, 0, TAG, MPI_COMM_WORLD);
+	MPI_Send(C, slice, MPI_DOUBLE, 0, TAG, MPI_COMM_WORLD);
 }
 
 int main(int argc, char **argv)
@@ -149,4 +149,3 @@ skip:
 	MPI_Finalize();
 	return 0;
 }
-
