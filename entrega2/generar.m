@@ -1,7 +1,7 @@
-pkg load image
+pkg load image;
 
-arg_list = argv();
-N = str2num(arg_list{1});
+ arg_list = argv();
+N  = str2num(arg_list{1});
 file = fopen(sprintf('data-%d.bin', N),'w');
 A = 1 * rand(N, N);
 B = 2 * rand(N, N);

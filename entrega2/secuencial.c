@@ -100,7 +100,8 @@ double multiply_ll(double *restrict C, const double *restrict A,
 				c += A[L_FIL(i, k)] * B[j * n + k];
 
 			C[i * n + j] = c;
-			s += A[L_FIL(i,j)];
+			if (i >= j)
+				s += A[L_FIL(i,j)];
 		}
 	}
 	return s;
@@ -126,7 +127,8 @@ double multiply_ru(double *restrict C, const double *restrict A,
 				c += A[i * n + k] * B[U_COL(k, j)];
 
 			C[i * n + j] = c;
-			s += B[U_COL(i, j)];
+			if (i <= j)
+				s += B[U_COL(i, j)];
 		}
 	}
 
@@ -167,7 +169,7 @@ int main(int argc, char **argv)
 	double *result;
 
 	/* Matriz con el resultado dado como entrada */
-	double *given_result;
+	double *given_result = NULL;
 
 	/* Tiempos */
 	double ti, tf;
@@ -217,10 +219,10 @@ int main(int argc, char **argv)
 		}
 
 		ptr = U;
-		for (int i = n; i >= 1; i--) {
-			lseek(fd, (n - i) * sizeof(double), SEEK_CUR);
+		for (int i = 1; i <= n; i++) {
 			read(fd, ptr, i * sizeof(double));
 			ptr += i;
+			lseek(fd, (n - i) * sizeof(double), SEEK_CUR);
 		}
 
 		read(fd, given_result, n * n * sizeof(double));
@@ -242,17 +244,17 @@ int main(int argc, char **argv)
 
 	ti = dwalltime();
 	{
-		const double telem = n * (n - 1) / 2;
+		const double elem = n * n;
 		double avg_l, avg_u;
 
 		double *AB = R1;
 		multiply(AB, A, B, n);
 
 		double *LC = A;
-		avg_l = multiply_ll(LC, L, C, n) / telem;
+		avg_l = multiply_ll(LC, L, C, n) / elem;
 
 		double *DU = B;
-		avg_u = multiply_ru(DU, D, U, n) / telem;
+		avg_u = multiply_ru(DU, D, U, n) / elem;
 
 		double *ABpLC = A;
 		add(ABpLC, AB, LC, n);
