@@ -215,8 +215,33 @@ void load(const char *filename, double *A, double *B, double *C, double *D,
 
 INLINE
 void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
-		double *L, double *U, double *aux1, double **res)
+		double *L, double *U, double *aux1, double **result)
 {
+		const double elem = n * n;
+		double sums[2];
+
+		double *AB = aux1;
+		multiply(AB, A, B, n, t, rank);
+
+		double *LC = A;
+		sums[0] = multiply_ll(LC, L, C, n, t, rank);
+
+		double *DU = B;
+		sums[1] = multiply_ru(DU, D, U, n, t, rank);
+
+		double *ABpLC = A;
+		add(ABpLC, AB, LC, n, t, rank);
+
+		double *res = ABpLC;
+
+		MPI_Allreduce(MPI_IN_PLACE, sums, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		add(res, ABpLC, DU, n, t, rank);
+		scale(res, sums[0] * sums[1] / (elem * elem), n, t, rank);
+
+		MPI_Gather(res + n * n / t * rank, n * n / t, MPI_DOUBLE, res, n * n / t,
+				MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+		*result = res;
 	
 }
 
@@ -230,8 +255,8 @@ void master(const char *filename, int n, int t)
 	B = malloc(n * n * sizeof(double));
 	C = malloc(n * n * sizeof(double));
 	D = malloc(n * n * sizeof(double));
-	U = malloc(n * (n - 1) / 2 * sizeof(double));
 	L = malloc(n * (n - 1) / 2 * sizeof(double));
+	U = malloc(n * (n - 1) / 2 * sizeof(double));
 	R1 = malloc(n * n * sizeof(double));
 
 	if (filename) {
@@ -260,7 +285,18 @@ void master(const char *filename, int n, int t)
 INLINE
 void slave(int rank, int n, int t)
 {
-	double *A, *B, *C, *D, *U, *L, *R1, *result, *expected_result;
+	double *A, *B, *C, *D, *U, *L, *R1, *result;
+	A = malloc(n * n / t * sizeof(double));
+	B = malloc(n * n / t * sizeof(double));
+	C = malloc(n * n / t * sizeof(double));
+	D = malloc(n * n / t * sizeof(double));
+	L = malloc(n * (n - 1) / 2 / t * sizeof(double));
+	U = malloc(n * (n - 1) / 2 / t * sizeof(double));
+	R1 = malloc(n * n / t * sizeof(double));
+
+	const int offset = n * n / t * rank;
+	// TODO L y U ??
+	common(0, n, t, A - offset, B - offset, C - offset, D - offset, L, U, R1, &result);
 }
 
 int main(int argc, char **argv)
