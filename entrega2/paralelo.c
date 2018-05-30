@@ -232,8 +232,6 @@ void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 		const int total = n * n;
 		const int slice = total / t;
 
-		if (rank == 0)
-			wait_for_gdb();
 
 		/*
 		 * Distribución de datos
@@ -253,10 +251,9 @@ void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 				displs[i] = L_FIL(n / t * i, 0);
 				sendcounts[i] = L_FIL(n / t * (i + 1), 0) - displs[i];
 			}
-			for (int i = 0; i < t; i++)
-				MPI_Scatterv(L, sendcounts, displs, MPI_DOUBLE,
-					L + displs[i], sendcounts[i], MPI_DOUBLE,
-					0, MPI_COMM_WORLD);
+			MPI_Scatterv(L, sendcounts, displs, MPI_DOUBLE,
+				L + displs[rank], sendcounts[rank], MPI_DOUBLE,
+				0, MPI_COMM_WORLD);
 		}
 
 
@@ -302,8 +299,8 @@ void master(const char *filename, int n, int t)
 	B = malloc(n * n * sizeof(double));
 	C = malloc(n * n * sizeof(double));
 	D = malloc(n * n * sizeof(double));
-	L = malloc(n * (n - 1) / 2 * sizeof(double));
-	U = malloc(n * (n - 1) / 2 * sizeof(double));
+	L = malloc(n * (n + 1) / 2 * sizeof(double));
+	U = malloc(n * (n + 1) / 2 * sizeof(double));
 	R1 = malloc(n * n * sizeof(double));
 
 	if (filename) {
@@ -345,7 +342,7 @@ void slave(int rank, int n, int t)
 	B = malloc(n * n *  sizeof(double));
 	C = malloc(n * n * sizeof(double));
 	D = malloc(n * n / t * sizeof(double));
-	L = malloc(l_slice(rank, n, t) * sizeof(double));
+	L = malloc((L_FIL(n / t * (rank + 1), 0) - L_FIL(n / t * rank, 0)) * sizeof(double));
 	U = malloc(n * (n + 1) / 2 * sizeof(double));
 	R1 = malloc(n * n / t * sizeof(double));
 
