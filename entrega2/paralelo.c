@@ -17,9 +17,19 @@
 #define INLINE __attribute__((always_inline)) inline
 
 /* Defines para acceso a matrices triangulares */
-#define U_FIL(i,j) (i * n + j - (i * (i + 1)) / 2)
-#define U_COL(i,j) (i + (j * (j + 1)) / 2)
-#define L_FIL(i,j) (j + (i * (i + 1)) / 2)
+#define U_FIL(i,j) ((i) * (n) + (j) - ((i) * ((i) + 1)) / 2)
+#define U_COL(i,j) ((i) + ((j) * ((j) + 1)) / 2)
+#define L_FIL(i,j) ((j) + ((i) * ((i) + 1)) / 2)
+
+INLINE
+int l_slice(int rank, int n, int t)
+{
+	const int nt = n / t;
+	const int a = nt * (rank + 1);
+	const int b = nt * rank;
+	
+	return (a * (a + 1) - b * (b + 1)) >> 1;
+}
 
 double dwalltime()
 {
@@ -219,6 +229,40 @@ void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 {
 		const double elem = n * n;
 		double sums[2];
+		const int total = n * n;
+		const int slice = total / t;
+
+		if (rank == 0)
+			wait_for_gdb();
+
+		/*
+		 * Distribución de datos
+		 */
+		MPI_Scatter(A, slice, MPI_DOUBLE, A + rank * slice, slice,
+				MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Bcast(B, total, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Bcast(C, total, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Scatter(D, slice, MPI_DOUBLE, D + rank * slice, slice,
+				MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Bcast(U, n * (n + 1) >> 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		/* El caso especial de L */
+		{
+			int sendcounts[t];
+			int displs[t];
+			for (int i = 0; i < t; i++) {
+				displs[i] = L_FIL(n / t * i, 0);
+				sendcounts[i] = L_FIL(n / t * (i + 1), 0) - displs[i];
+			}
+			for (int i = 0; i < t; i++)
+				MPI_Scatterv(L, sendcounts, displs, MPI_DOUBLE,
+					L + displs[i], sendcounts[i], MPI_DOUBLE,
+					0, MPI_COMM_WORLD);
+		}
+
+
+		/*
+		 * Cómputo
+		 */
 
 		double *AB = aux1;
 		multiply(AB, A, B, n, t, rank);
@@ -238,6 +282,9 @@ void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 		add(res, ABpLC, DU, n, t, rank);
 		scale(res, sums[0] * sums[1] / (elem * elem), n, t, rank);
 
+		/*
+		 * Gather del resultado
+		 */
 		MPI_Gather(res + n * n / t * rank, n * n / t, MPI_DOUBLE, res, n * n / t,
 				MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
@@ -280,6 +327,14 @@ void master(const char *filename, int n, int t)
 
 	if (filename)
 		fprintf(stderr, "RMS*RMS = %f\n", rms(expected_result, result, n));
+
+	free(A);
+	free(B);
+	free(C);
+	free(D);
+	free(U);
+	free(L);
+	free(R1);
 }
 
 INLINE
@@ -287,16 +342,23 @@ void slave(int rank, int n, int t)
 {
 	double *A, *B, *C, *D, *U, *L, *R1, *result;
 	A = malloc(n * n / t * sizeof(double));
-	B = malloc(n * n / t * sizeof(double));
-	C = malloc(n * n / t * sizeof(double));
+	B = malloc(n * n *  sizeof(double));
+	C = malloc(n * n * sizeof(double));
 	D = malloc(n * n / t * sizeof(double));
-	L = malloc(n * (n - 1) / 2 / t * sizeof(double));
-	U = malloc(n * (n - 1) / 2 / t * sizeof(double));
+	L = malloc(l_slice(rank, n, t) * sizeof(double));
+	U = malloc(n * (n + 1) / 2 * sizeof(double));
 	R1 = malloc(n * n / t * sizeof(double));
 
 	const int offset = n * n / t * rank;
-	// TODO L y U ??
-	common(0, n, t, A - offset, B - offset, C - offset, D - offset, L, U, R1, &result);
+	common(rank, n, t, A - offset, B, C, D - offset, L - L_FIL(n / t * rank, 0), U, R1 - offset, &result);
+
+	free(A);
+	free(B);
+	free(C);
+	free(D);
+	free(U);
+	free(L);
+	free(R1);
 }
 
 int main(int argc, char **argv)

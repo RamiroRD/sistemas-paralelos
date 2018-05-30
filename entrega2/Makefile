@@ -7,7 +7,7 @@ mpi: paralelo.c
 	mpicc $(CFLAGS) -o mpi paralelo.c
 
 hibrido: paralelo.c
-	mpicc $(CFLAGS) -fopenmp -o mpi paralelo.c
+	mpicc $(CFLAGS) -fopenmp -o hibrido paralelo.c
 
 clean:
 	rm -f secuencial mpi hibrido
