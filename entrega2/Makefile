@@ -1,5 +1,5 @@
 CC=cc
-CFLAGS=-std=c99 -O0 -Wall -pedantic-errors -ggdb
+CFLAGS=-std=c99 -O0 -Wall -pedantic-errors -ggdb -Wno-unknown-pragmas
 
 all: secuencial mpi hibrido
 

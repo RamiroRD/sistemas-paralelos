@@ -50,6 +50,7 @@ void add(double *C, const double *A, const double *B, int n, int t, int rank)
 {
 	const int slice = n * n / t;
 
+#pragma omp parallel for
 	for (int i = 0; i < slice; i++)
 		C[i] = A[i] + B[i];
 }
@@ -63,6 +64,7 @@ void scale(double *A, double factor, int n, int t, int rank)
 {
 	const int slice = n * n / t;
 
+#pragma omp parallel for
 	for (int i = 0; i < slice; i++)
 		A[i] *= factor;
 }
@@ -78,6 +80,7 @@ double sum(const double *A, int n, int t, int rank)
 
 	double s = 0;
 
+#pragma omp parallel for
 	for (int i = 0; i < slice; i++)
 		s += A[i];
 
@@ -93,6 +96,7 @@ void multiply(double *C, const double *restrict A,
 	double c;
 
 	/* Multiplicación convencional fila * columna */
+#pragma omp parallel for
 	for (int i = offset; i < (rank + 1) * slice; i++) {
 		for (int j = 0; j < n; j++) {
 			c = 0;
@@ -120,6 +124,7 @@ double multiply_ll(double *restrict C, const double *restrict A,
 	double c;
 	double s = 0;
 
+#pragma omp parallel for schedule(dynamic, 16)
 	for (int i = offset; i < (rank + 1) * slice; i++) {
 		for (int j = 0; j < n; j++) {
 			c = 0;
@@ -149,6 +154,7 @@ double multiply_ru(double *restrict C, const double *restrict A,
 	double c;
 	double s = 0;
 
+#pragma omp parallel for schedule(dynamic, 16)
 	for (int i = offset; i < (rank + 1) * slice; i++) {
 		for (int j = 0; j < n; j++) {
 			c = 0;
@@ -227,69 +233,69 @@ INLINE
 void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 		double *L, double *U, double *aux1, double **result)
 {
-		const double elem = n * n;
-		double sums[2];
-		const int total = n * n;
-		const int slice = total / t;
+	const double elem = n * n;
+	double sums[2];
+	const int total = n * n;
+	const int slice = total / t;
 
-		/*
-		 * Distribución de datos
-		 */
+	/*
+	 * Distribución de datos
+	 */
 
-		MPI_Scatter(A, slice, MPI_DOUBLE, A, slice,
-				MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(B, total, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(C, total, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Scatter(D, slice, MPI_DOUBLE, D, slice,
-				MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(U, n * (n + 1) >> 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		/* El caso especial de L */
-		{
-			int sendcounts[t];
-			int displs[t];
-			for (int i = 0; i < t; i++) {
-				displs[i] = L_FIL(n / t * i, 0);
-				sendcounts[i] = L_FIL(n / t * (i + 1), 0) - displs[i];
-			}
-			MPI_Scatterv(L, sendcounts, displs, MPI_DOUBLE,
-				L, sendcounts[rank], MPI_DOUBLE,
-				0, MPI_COMM_WORLD);
+	MPI_Scatter(A, slice, MPI_DOUBLE, A, slice,
+			MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Bcast(B, total, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Bcast(C, total, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Scatter(D, slice, MPI_DOUBLE, D, slice,
+			MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Bcast(U, n * (n + 1) >> 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	/* El caso especial de L */
+	{
+		int sendcounts[t];
+		int displs[t];
+		for (int i = 0; i < t; i++) {
+			displs[i] = L_FIL(n / t * i, 0);
+			sendcounts[i] = L_FIL(n / t * (i + 1), 0) - displs[i];
 		}
+		MPI_Scatterv(L, sendcounts, displs, MPI_DOUBLE,
+			L, sendcounts[rank], MPI_DOUBLE,
+			0, MPI_COMM_WORLD);
+	}
 
-		MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 
-		/*
-		 * Cómputo
-		 */
+	/*
+	 * Cómputo
+	 */
 
-		double *AB = aux1;
-		multiply(AB, A, B, n, t, rank);
+	double *AB = aux1;
+	multiply(AB, A, B, n, t, rank);
 
-		double *LC = A;
-		sums[0] = multiply_ll(LC, L, C, n, t, rank);
+	double *LC = A;
+	sums[0] = multiply_ll(LC, L, C, n, t, rank);
 
-		double *DU = B;
-		sums[1] = multiply_ru(DU, D, U, n, t, rank);
+	double *DU = B;
+	sums[1] = multiply_ru(DU, D, U, n, t, rank);
 
-		double *ABpLC = A;
-		add(ABpLC, AB, LC, n, t, rank);
+	double *ABpLC = A;
+	add(ABpLC, AB, LC, n, t, rank);
 
-		double *res = AB;
+	double *res = AB;
 
-		MPI_Allreduce(MPI_IN_PLACE, sums, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-		add(res, ABpLC, DU, n, t, rank);
-		scale(res, sums[0] * sums[1] / (elem * elem), n, t, rank);
+	MPI_Allreduce(MPI_IN_PLACE, sums, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	add(res, ABpLC, DU, n, t, rank);
+	scale(res, sums[0] * sums[1] / (elem * elem), n, t, rank);
 
-		MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 
-		/*
-		 * Gather del resultado
-		 */
+	/*
+	 * Gather del resultado
+	 */
 
-		MPI_Gather(res, slice, MPI_DOUBLE, res, slice,
-				MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(res, slice, MPI_DOUBLE, res, slice,
+			MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-		*result = res;
+	*result = res;
 
 }
 
