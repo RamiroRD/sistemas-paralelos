@@ -237,7 +237,7 @@ void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 	double sums[2];
 	const int total = n * n;
 	const int slice = total / t;
-
+	double dur;
 	/*
 	 * Distribución de datos
 	 */
@@ -271,11 +271,15 @@ void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 	double *AB = aux1;
 	multiply(AB, A, B, n, t, rank);
 
+	dur = dwalltime();
+
 	double *LC = A;
 	sums[0] = multiply_ll(LC, L, C, n, t, rank);
 
 	double *DU = B;
 	sums[1] = multiply_ru(DU, D, U, n, t, rank);
+
+	printf("T(rank %d) = %f [s] \n", rank, dwalltime() - dur);
 
 	double *ABpLC = A;
 	add(ABpLC, AB, LC, n, t, rank);
@@ -336,8 +340,8 @@ void master(const char *filename, int n, int t)
 	{
 		double rms[2];
 		error(expected_result, result, n, rms);
-		fprintf(stderr, "RMS*RMS = %f\n", rms[0]);
-		fprintf(stderr, "promedio = %f\n", rms[1]);
+		fprintf(stderr, "RMS*RMS = %.25f\n", rms[0]);
+		fprintf(stderr, "promedio = %.25f\n", rms[1]);
 
 		free(expected_result);
 	}
