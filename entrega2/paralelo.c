@@ -80,7 +80,7 @@ double sum(const double *A, int n, int t, int rank)
 
 	double s = 0;
 
-#pragma omp parallel for
+#pragma omp parallel for reduction(+:s)
 	for (int i = 0; i < slice; i++)
 		s += A[i];
 
@@ -96,7 +96,7 @@ void multiply(double *C, const double *restrict A,
 	double c;
 
 	/* Multiplicación convencional fila * columna */
-#pragma omp parallel for
+#pragma omp parallel for private(c)
 	for (int i = offset; i < (rank + 1) * slice; i++) {
 		for (int j = 0; j < n; j++) {
 			c = 0;
@@ -124,7 +124,7 @@ double multiply_ll(double *restrict C, const double *restrict A,
 	double c;
 	double s = 0;
 
-#pragma omp parallel for schedule(dynamic, 16)
+#pragma omp parallel for schedule(dynamic, 16) private(c,s)
 	for (int i = offset; i < (rank + 1) * slice; i++) {
 		for (int j = 0; j < n; j++) {
 			c = 0;
@@ -150,11 +150,11 @@ double multiply_ru(double *restrict C, const double *restrict A,
 		 const double *restrict B, int n, int t, int rank)
 {
 	const int slice = n / t;
-	const	int offset = rank * slice;
+	const int offset = rank * slice;
 	double c;
 	double s = 0;
 
-#pragma omp parallel for schedule(dynamic, 16)
+#pragma omp parallel for schedule(dynamic, 16) private(c,s)
 	for (int i = offset; i < (rank + 1) * slice; i++) {
 		for (int j = 0; j < n; j++) {
 			c = 0;
@@ -238,6 +238,8 @@ void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 	const int total = n * n;
 	const int slice = total / t;
 	double dur;
+	double durrel;
+
 	/*
 	 * Distribución de datos
 	 */
@@ -268,10 +270,11 @@ void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 	 * Cómputo
 	 */
 
+	durrel = dwalltime();
+
 	double *AB = aux1;
 	multiply(AB, A, B, n, t, rank);
 
-	dur = dwalltime();
 
 	double *LC = A;
 	sums[0] = multiply_ll(LC, L, C, n, t, rank);
@@ -279,16 +282,23 @@ void common(int rank, int n, int t, double *A, double *B, double *C, double *D,
 	double *DU = B;
 	sums[1] = multiply_ru(DU, D, U, n, t, rank);
 
-	printf("T(rank %d) = %f [s] \n", rank, dwalltime() - dur);
 
 	double *ABpLC = A;
 	add(ABpLC, AB, LC, n, t, rank);
 
 	double *res = AB;
 
+	dur = dwalltime() - durrel;
+
 	MPI_Allreduce(MPI_IN_PLACE, sums, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+	durrel = dwalltime();
+
 	add(res, ABpLC, DU, n, t, rank);
 	scale(res, sums[0] * sums[1] / (elem * elem), n, t, rank);
+
+	dur += dwalltime() - durrel;
+	printf("T(rank %d) = %f [s] \n", rank, dur);
 
 	MPI_Barrier(MPI_COMM_WORLD);
 

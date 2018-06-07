@@ -1,0 +1,106 @@
+make: No se hace nada para 'all'.
+./secuencial 512
+T = 0.756546 [s]
+./secuencial 1024
+T = 6.108083 [s]
+./secuencial 2048
+T = 48.716648 [s]
+mpirun -np 4 mpi 512
+T(rank 3) = 0.258546 [s] 
+T(rank 2) = 0.231283 [s] 
+T(rank 1) = 0.202948 [s] 
+T(rank 0) = 0.175542 [s] 
+T = 0.265000 [s] 
+mpirun -np 4 mpi 1024
+T(rank 0) = 1.440767 [s] 
+T(rank 1) = 1.665141 [s] 
+T(rank 2) = 1.890773 [s] 
+T(rank 3) = 2.109701 [s] 
+T = 2.131040 [s] 
+mpirun -np 4 mpi 2048
+T(rank 1) = 13.002663 [s] 
+T(rank 2) = 14.821687 [s] 
+T(rank 3) = 16.621607 [s] 
+T(rank 0) = 11.242539 [s] 
+T = 16.706009 [s] 
+mpirun -np 4 -machinefile maquinas_2_4 mpi 512
+T(rank 0) = 0.159645 [s] 
+T(rank 1) = 0.186269 [s] 
+T(rank 2) = 0.211619 [s] 
+T(rank 3) = 0.237309 [s] 
+T = 0.355106 [s] 
+mpirun -np 4 -machinefile maquinas_2_4 mpi 1024
+T(rank 1) = 1.514132 [s] 
+T(rank 0) = 1.301613 [s] 
+T(rank 2) = 1.735342 [s] 
+T(rank 3) = 1.941727 [s] 
+T = 2.280403 [s] 
+mpirun -np 4 -machinefile maquinas_2_4 mpi 2048
+T(rank 1) = 12.009211 [s] 
+T(rank 2) = 13.723330 [s] 
+T(rank 0) = 10.332954 [s] 
+T(rank 3) = 15.408627 [s] 
+T = 16.746778 [s] 
+mpirun -np 8 -machinefile maquinas_2_8 mpi 512
+T(rank 2) = 0.098152 [s] 
+T(rank 3) = 0.105067 [s] 
+T(rank 0) = 0.083387 [s] 
+T(rank 1) = 0.090930 [s] 
+T(rank 4) = 0.115716 [s] 
+T(rank 5) = 0.124599 [s] 
+T(rank 6) = 0.129250 [s] 
+T(rank 7) = 0.135464 [s] 
+T = 0.334726 [s] 
+mpirun -np 8 -machinefile maquinas_2_8 mpi 1024
+T(rank 1) = 0.738678 [s] 
+T(rank 3) = 0.850301 [s] 
+T(rank 2) = 0.795778 [s] 
+T(rank 0) = 0.686043 [s] 
+T(rank 4) = 0.919823 [s] 
+T(rank 5) = 0.978259 [s] 
+T(rank 6) = 1.029893 [s] 
+T(rank 7) = 1.077902 [s] 
+T = 1.419077 [s] 
+mpirun -np 8 -machinefile maquinas_2_8 mpi 2048
+T(rank 0) = 5.401034 [s] 
+T(rank 2) = 6.294586 [s] 
+T(rank 3) = 6.746778 [s] 
+T(rank 1) = 5.831345 [s] 
+T(rank 6) = 8.132600 [s] 
+T(rank 4) = 7.199939 [s] 
+T(rank 7) = 8.584153 [s] 
+T(rank 5) = 7.649694 [s] 
+T = 9.931539 [s] 
+mpirun -np 1 --bind-to none hibrido 512 4
+T(rank 0) = 0.263582 [s] 
+T = 0.264408 [s] 
+mpirun -np 1 --bind-to none hibrido 1024 4
+T(rank 0) = 2.090690 [s] 
+T = 2.094947 [s] 
+mpirun -np 1 --bind-to none hibrido 2048 4
+T(rank 0) = 16.652005 [s] 
+T = 16.672245 [s] 
+mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 512 2
+T(rank 0) = 0.213123 [s] 
+T(rank 1) = 0.273037 [s] 
+T = 0.362201 [s] 
+mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 1024 2
+T(rank 0) = 1.710857 [s] 
+T(rank 1) = 2.192804 [s] 
+T = 2.540511 [s] 
+mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 2048 2
+T(rank 0) = 13.653372 [s] 
+T(rank 1) = 17.445732 [s] 
+T = 18.776596 [s] 
+mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 512 4
+T(rank 0) = 0.115199 [s] 
+T(rank 1) = 0.148271 [s] 
+T = 0.239561 [s] 
+mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 1024 4
+T(rank 0) = 0.913878 [s] 
+T(rank 1) = 1.179875 [s] 
+T = 1.521903 [s] 
+mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 2048 4
+T(rank 0) = 7.270458 [s] 
+T(rank 1) = 9.393279 [s] 
+T = 10.723894 [s] 
