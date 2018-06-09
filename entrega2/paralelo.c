@@ -21,16 +21,6 @@
 #define U_COL(i,j) ((i) + ((j) * ((j) + 1)) / 2)
 #define L_FIL(i,j) ((j) + ((i) * ((i) + 1)) / 2)
 
-INLINE
-int l_slice(int rank, int n, int t)
-{
-	const int nt = n / t;
-	const int a = nt * (rank + 1);
-	const int b = nt * rank;
-
-	return (a * (a + 1) - b * (b + 1)) >> 1;
-}
-
 double dwalltime()
 {
 	double sec;
