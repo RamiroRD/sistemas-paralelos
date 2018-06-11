@@ -1,0 +1,127 @@
++ for size in 512 1024 2048
++ ./secuencial 512
+T = 0.755546 [s]
++ for size in 512 1024 2048
++ ./secuencial 1024
+T = 6.078876 [s]
++ for size in 512 1024 2048
++ ./secuencial 2048
+T = 48.819262 [s]
++ for size in 512 1024 2048
++ mpirun -np 4 mpi 512
+T(rank 3) = 0.258435 [s] 
+T(rank 2) = 0.232868 [s] 
+T(rank 1) = 0.202751 [s] 
+T(rank 0) = 0.175237 [s] 
+T = 0.265494 [s] 
++ for size in 512 1024 2048
++ mpirun -np 4 mpi 1024
+T(rank 1) = 1.660174 [s] 
+T(rank 2) = 1.905073 [s] 
+T(rank 3) = 2.106471 [s] 
+T(rank 0) = 1.443450 [s] 
+T = 2.127624 [s] 
++ for size in 512 1024 2048
++ mpirun -np 4 mpi 2048
+T(rank 2) = 14.784382 [s] 
+T(rank 3) = 16.582851 [s] 
+T(rank 1) = 13.003109 [s] 
+T(rank 0) = 11.213882 [s] 
+T = 16.674111 [s] 
++ for size in 512 1024 2048
++ mpirun -np 4 -machinefile maquinas_2_4 mpi 512
+T(rank 0) = 0.160495 [s] 
+T(rank 1) = 0.186792 [s] 
+T(rank 2) = 0.211506 [s] 
+T(rank 3) = 0.237184 [s] 
+T = 0.347465 [s] 
++ for size in 512 1024 2048
++ mpirun -np 4 -machinefile maquinas_2_4 mpi 1024
+T(rank 1) = 1.516313 [s] 
+T(rank 0) = 1.308897 [s] 
+T(rank 2) = 1.703486 [s] 
+T(rank 3) = 1.919605 [s] 
+T = 2.489242 [s] 
++ for size in 512 1024 2048
++ mpirun -np 4 -machinefile maquinas_2_4 mpi 2048
+T(rank 1) = 12.011563 [s] 
+T(rank 2) = 13.532601 [s] 
+T(rank 3) = 15.224658 [s] 
+T(rank 0) = 10.378108 [s] 
+T = 16.651274 [s] 
++ for size in 512 1024 2048
++ mpirun -np 8 -machinefile maquinas_2_8 mpi 512
+T(rank 2) = 0.097897 [s] 
+T(rank 3) = 0.105314 [s] 
+T(rank 1) = 0.090891 [s] 
+T(rank 6) = 0.125536 [s] 
+T(rank 0) = 0.084320 [s] 
+T(rank 4) = 0.111034 [s] 
+T(rank 5) = 0.118699 [s] 
+T(rank 7) = 0.131358 [s] 
+T = 0.355079 [s] 
++ for size in 512 1024 2048
++ mpirun -np 8 -machinefile maquinas_2_8 mpi 1024
+T(rank 1) = 0.745903 [s] 
+T(rank 2) = 0.805679 [s] 
+T(rank 3) = 0.860928 [s] 
+T(rank 7) = 1.063269 [s] 
+T(rank 0) = 0.695689 [s] 
+T(rank 4) = 0.902311 [s] 
+T(rank 5) = 0.957848 [s] 
+T(rank 6) = 1.016129 [s] 
+T = 1.426843 [s] 
++ for size in 512 1024 2048
++ mpirun -np 8 -machinefile maquinas_2_8 mpi 2048
+T(rank 1) = 5.820496 [s] 
+T(rank 2) = 6.297731 [s] 
+T(rank 3) = 6.752099 [s] 
+T(rank 5) = 7.509759 [s] 
+T(rank 7) = 8.381746 [s] 
+T(rank 4) = 7.066698 [s] 
+T(rank 6) = 7.963617 [s] 
+T(rank 0) = 5.413842 [s] 
+T = 10.019607 [s] 
++ for size in 512 1024 2048
++ mpirun -np 1 --bind-to none hibrido 512 4
+T(rank 0) = 0.266614 [s] 
+T = 0.267571 [s] 
++ for size in 512 1024 2048
++ mpirun -np 1 --bind-to none hibrido 1024 4
+T(rank 0) = 2.090350 [s] 
+T = 2.094414 [s] 
++ for size in 512 1024 2048
++ mpirun -np 1 --bind-to none hibrido 2048 4
+T(rank 0) = 16.640803 [s] 
+T = 16.661049 [s] 
++ for size in 512 1024 2048
++ mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 512 2
+T(rank 0) = 0.213093 [s] 
+T(rank 1) = 0.272972 [s] 
+T = 0.374264 [s] 
++ for size in 512 1024 2048
++ mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 1024 2
+T(rank 0) = 1.717700 [s] 
+T(rank 1) = 2.180449 [s] 
+T = 2.744629 [s] 
++ for size in 512 1024 2048
++ mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 2048 2
+T(rank 0) = 13.700970 [s] 
+T(rank 1) = 17.354593 [s] 
+T = 18.733502 [s] 
++ for size in 512 1024 2048
++ mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 512 4
+T(rank 0) = 0.115006 [s] 
+T(rank 1) = 0.148290 [s] 
+T = 0.244512 [s] 
++ for size in 512 1024 2048
++ mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 1024 4
+T(rank 1) = 1.171512 [s] 
+T(rank 0) = 0.920207 [s] 
+T = 1.531100 [s] 
++ for size in 512 1024 2048
++ mpirun -np 2 -machinefile maquinas_2_2 --bind-to none hibrido 2048 4
+T(rank 1) = 9.292516 [s] 
+T(rank 0) = 7.368828 [s] 
+T = 10.669369 [s] 
+
